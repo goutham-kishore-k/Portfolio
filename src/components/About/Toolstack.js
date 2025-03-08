@@ -53,9 +53,6 @@ function Techstack() {
       <Col xs={4} md={2} className="tech-icons">
         <DiJavascript1 />
       </Col>
-      <Col xs={4} md={2} className="tech-icons">
-        <SiSolidity />
-      </Col>
 
       {/* Data Science Libraries */}
       <Col xs={4} md={2} className="tech-icons">
