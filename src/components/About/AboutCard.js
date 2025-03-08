@@ -24,7 +24,7 @@ function AboutCard() {
             drive strategic decisions.
             <br />
             <br />
-            other interests {":>"}
+            other interests 😋:
           </p>
           <ul>
             <li className="about-activity">
