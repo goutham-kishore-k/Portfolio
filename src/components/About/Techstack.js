@@ -2,7 +2,6 @@ import React from "react";
 import { Col, Row } from "react-bootstrap";
 import { FaMicrosoft, FaJira } from "react-icons/fa";
 import {
-  SiApachenifi,
   SiApachekafka,
   SiSupabase,
   SiKubernetes,
@@ -30,9 +29,6 @@ function Toolstack() {
       </Col>
 
       {/* Data Tools */}
-      <Col xs={4} md={2} className="tech-icons">
-        <SiApachenifi />
-      </Col>
       <Col xs={4} md={2} className="tech-icons">
         <SiApachekafka />
       </Col>
