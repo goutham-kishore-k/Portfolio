@@ -1,71 +1,73 @@
 import React from "react";
 import { Col, Row } from "react-bootstrap";
-import { CgCPlusPlus } from "react-icons/cg";
+import { FaMicrosoft, FaJira } from "react-icons/fa";
 import {
-  DiJavascript1,
-  DiReact,
-  DiNodejs,
-  DiMongodb,
-  DiPython,
-  DiGit,
-  DiJava,
-} from "react-icons/di";
-import {
-  SiRedis,
-  SiFirebase,
-  SiNextdotjs,
-  SiSolidity,
-  SiPostgresql,
+  SiApachenifi,
+  SiApachekafka,
+  SiSupabase,
+  SiKubernetes,
+  SiDocker,
+  SiJupyter,
+  SiAnaconda,
+  SiRstudio,
+  SiApacheairflow,
+  SiDatabricks,
+  SiApachehadoop,
 } from "react-icons/si";
-import { TbBrandGolang } from "react-icons/tb";
 
-function Techstack() {
+function Toolstack() {
   return (
     <Row style={{ justifyContent: "center", paddingBottom: "50px" }}>
+      {/* Data Science IDEs and Environments */}
       <Col xs={4} md={2} className="tech-icons">
-        <CgCPlusPlus />
+        <SiJupyter />
       </Col>
       <Col xs={4} md={2} className="tech-icons">
-        <DiJavascript1 />
+        <SiAnaconda />
       </Col>
       <Col xs={4} md={2} className="tech-icons">
-        <TbBrandGolang />
+        <SiRstudio />
+      </Col>
+
+      {/* Data Tools */}
+      <Col xs={4} md={2} className="tech-icons">
+        <SiApachenifi />
       </Col>
       <Col xs={4} md={2} className="tech-icons">
-        <DiNodejs />
+        <SiApachekafka />
       </Col>
       <Col xs={4} md={2} className="tech-icons">
-        <DiReact />
+        <SiSupabase /> {/* Representing Apache Superset */}
       </Col>
       <Col xs={4} md={2} className="tech-icons">
-        <SiSolidity />
+        <SiApacheairflow />
       </Col>
       <Col xs={4} md={2} className="tech-icons">
-        <DiMongodb />
+        <SiDatabricks />
       </Col>
       <Col xs={4} md={2} className="tech-icons">
-        <SiNextdotjs />
+        <SiApachehadoop />
+      </Col>
+
+      {/* DevOps and CI/CD Tools */}
+      <Col xs={4} md={2} className="tech-icons">
+        <SiKubernetes />
       </Col>
       <Col xs={4} md={2} className="tech-icons">
-        <DiGit />
+        <SiDocker />
       </Col>
+
+      {/* Collaboration and Version Control */}
       <Col xs={4} md={2} className="tech-icons">
-        <SiFirebase />
+        <FaJira /> {/* Representing JIRA */}
       </Col>
+
+      {/* Office Tools */}
       <Col xs={4} md={2} className="tech-icons">
-        <SiRedis />
-      </Col>
-      <Col xs={4} md={2} className="tech-icons">
-        <SiPostgresql />
-      </Col>
-      <Col xs={4} md={2} className="tech-icons">
-        <DiPython />
-      </Col>
-      <Col xs={4} md={2} className="tech-icons">
-        <DiJava />
+        <FaMicrosoft /> {/* Representing Microsoft Office/Excel */}
       </Col>
     </Row>
   );
 }
 
-export default Techstack;
+export default Toolstack;
