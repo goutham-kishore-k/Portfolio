@@ -1,69 +1,134 @@
 import React from "react";
 import { Col, Row } from "react-bootstrap";
-import { FaMicrosoft, FaJira } from "react-icons/fa";
+import { CgCPlusPlus } from "react-icons/cg";
 import {
-  SiApachekafka,
-  SiSupabase,
-  SiKubernetes,
-  SiDocker,
-  SiJupyter,
-  SiAnaconda,
-  SiRstudio,
-  SiApacheairflow,
-  SiDatabricks,
-  SiApachehadoop,
+  DiJavascript1,
+  DiReact,
+  DiNodejs,
+  DiMongodb,
+  DiPython,
+  DiGit,
+  DiJava,
+  DiBootstrap,
+  DiScala,
+} from "react-icons/di";
+import {
+  SiPostgresql,
+  SiOracle,
+  SiHtml5,
+  SiCss3,
+  SiAngularjs,
+  SiSpringboot,
+  SiPandas,
+  SiNumpy,
+  SiScikitlearn,
+  SiTensorflow,
+  SiPytorch,
+  SiKeras,
+  SiTableau,
+  SiPowerbi,
+  SiApachespark,
+  SiR,
 } from "react-icons/si";
+import { TbBrandGolang } from "react-icons/tb";
 
-function Toolstack() {
+function Techstack() {
   return (
     <Row style={{ justifyContent: "center", paddingBottom: "50px" }}>
-      {/* Data Science IDEs and Environments */}
+       Programming Languages 
       <Col xs={4} md={2} className="tech-icons">
-        <SiJupyter />
+        <DiPython />
       </Col>
       <Col xs={4} md={2} className="tech-icons">
-        <SiAnaconda />
+        <SiR />
       </Col>
       <Col xs={4} md={2} className="tech-icons">
-        <SiRstudio />
-      </Col>
-
-      {/* Data Tools */}
-      <Col xs={4} md={2} className="tech-icons">
-        <SiApachekafka />
+        <DiJava />
       </Col>
       <Col xs={4} md={2} className="tech-icons">
-        <SiSupabase /> {/* Representing Apache Superset */}
+        <DiJavascript1 />
       </Col>
       <Col xs={4} md={2} className="tech-icons">
-        <SiApacheairflow />
+        <DiScala />
+      </Col>
+      
+      Data Science Libraries
+      <Col xs={4} md={2} className="tech-icons">
+        <SiPandas />
       </Col>
       <Col xs={4} md={2} className="tech-icons">
-        <SiDatabricks />
+        <SiNumpy />
       </Col>
       <Col xs={4} md={2} className="tech-icons">
-        <SiApachehadoop />
-      </Col>
-
-      {/* DevOps and CI/CD Tools */}
-      <Col xs={4} md={2} className="tech-icons">
-        <SiKubernetes />
+        <SiScikitlearn />
       </Col>
       <Col xs={4} md={2} className="tech-icons">
-        <SiDocker />
+        <SiTensorflow />
       </Col>
-
-      {/* Collaboration and Version Control */}
       <Col xs={4} md={2} className="tech-icons">
-        <FaJira /> {/* Representing JIRA */}
+        <SiPytorch />
+      </Col>
+      <Col xs={4} md={2} className="tech-icons">
+        <SiKeras />
       </Col>
 
-      {/* Office Tools */}
+      Big Data
       <Col xs={4} md={2} className="tech-icons">
-        <FaMicrosoft /> {/* Representing Microsoft Office/Excel */}
+        <SiApachespark />
       </Col>
+
+      Visualization
+      <Col xs={4} md={2} className="tech-icons">
+        <SiTableau />
+      </Col>
+      <Col xs={4} md={2} className="tech-icons">
+        <SiPowerbi />
+      </Col>
+
+      Frameworks 
+      <Col xs={4} md={2} className="tech-icons">
+        <DiReact />
+      </Col>
+      <Col xs={4} md={2} className="tech-icons">
+        <DiNodejs />
+      </Col>
+      <Col xs={4} md={2} className="tech-icons">
+        <SiAngularjs />
+      </Col>
+      <Col xs={4} md={2} className="tech-icons">
+        <SiSpringboot />
+      </Col>
+
+      Databases
+      <Col xs={4} md={2} className="tech-icons">
+        <DiMongodb />
+      </Col>
+      <Col xs={4} md={2} className="tech-icons">
+        <SiPostgresql />
+      </Col>
+      <Col xs={4} md={2} className="tech-icons">
+        <SiOracle />
+      </Col>
+
+      Web Technologies
+      <Col xs={4} md={2} className="tech-icons">
+        <SiHtml5 />
+      </Col>
+      <Col xs={4} md={2} className="tech-icons">
+        <SiCss3 />
+      </Col>
+      <Col xs={4} md={2} className="tech-icons">
+        <DiBootstrap />
+      </Col>
+
+      Version Control
+      <Col xs={4} md={2} className="tech-icons">
+        <DiGit />
+      </Col>
+
+      {/* Cloud Services */}
     </Row>
   );
 }
 
-export default Toolstack;
+export default Techstack;
