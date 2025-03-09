@@ -14,12 +14,13 @@ html {
   --imp-text-color: #7085f0;
 }
 
+
 .purple {
   color: var(--imp-text-color) !important;
 }
 
-.subheading {
-  color: var(--imp-text-color) !important;
+.project-subheading{
+  color:  rgba(121, 143, 216, 0.959);
   opacity: 0.9;
 }
 
@@ -259,10 +260,10 @@ button:focus {
   padding-top: 80px !important;
 }
 
-.home-section {
+.home-section1 {
   position: relative;
   z-index: -1;
-  background-image: var(--image-gradient), url(./Assets/home-bg.png);
+  /*background-image: var(--image-gradient), url(./Assets/home-bg.png);*/
   background-position: top center;
   background-repeat: repeat;
   background-size: cover;

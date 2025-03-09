@@ -35,7 +35,7 @@ import { TbBrandGolang } from "react-icons/tb";
 function Techstack() {
   return (
     <Row style={{ justifyContent: "center", paddingBottom: "50px" }}>
-       Programming Languages 
+      <h3 className="project-subheading">Programming Languages</h3> 
       <Col xs={4} md={2} className="tech-icons">
         <DiPython />
       </Col>
@@ -52,7 +52,7 @@ function Techstack() {
         <DiScala />
       </Col>
       
-      Data Science Libraries
+      <h3 className="project-subheading">Data Science Libraries</h3>
       <Col xs={4} md={2} className="tech-icons">
         <SiPandas />
       </Col>
@@ -72,12 +72,12 @@ function Techstack() {
         <SiKeras />
       </Col>
 
-      Big Data
+      <h3 className="project-subheading">Big Data</h3>
       <Col xs={4} md={2} className="tech-icons">
         <SiApachespark />
       </Col>
 
-      Visualization
+      <h3 className="project-subheading">Visualization</h3>
       <Col xs={4} md={2} className="tech-icons">
         <SiTableau />
       </Col>
@@ -85,7 +85,7 @@ function Techstack() {
         <SiPowerbi />
       </Col>
 
-      Frameworks 
+      <h3 className="project-subheading">Frameworks</h3>
       <Col xs={4} md={2} className="tech-icons">
         <DiReact />
       </Col>
@@ -99,7 +99,7 @@ function Techstack() {
         <SiSpringboot />
       </Col>
 
-      Databases
+      <h3 className="project-subheading">Databases</h3>
       <Col xs={4} md={2} className="tech-icons">
         <DiMongodb />
       </Col>
@@ -110,7 +110,7 @@ function Techstack() {
         <SiOracle />
       </Col>
 
-      Web Technologies
+      <h3 className="project-subheading">Web Technologies</h3>
       <Col xs={4} md={2} className="tech-icons">
         <SiHtml5 />
       </Col>
@@ -121,7 +121,7 @@ function Techstack() {
         <DiBootstrap />
       </Col>
 
-      Version Control
+      <h3 className="project-subheading">Version Control</h3>
       <Col xs={4} md={2} className="tech-icons">
         <DiGit />
       </Col>

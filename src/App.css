@@ -1,5 +1,9 @@
 .App {
   text-align: center;
+  background-image: var(--image-gradient), url(./Assets/home-bg.png);
+  background-repeat: repeat;
+  background-size: cover;
+  position: relative;
 }
 
 .App-logo {
