@@ -52,7 +52,7 @@ function Projects() {
             <ProjectCard
               imgPath={Stock}
               isBlog={false}
-              title="Stock Market Prediction/Classification"
+              title="SentiFlux: Social Sentiment Market Prediction Engine"
               description="This project uses Reddit data and global news to generate sentiment scores, predicting whether a stock's price will rise or fall. It combines machine learning models with pattern recognition to analyze trends and provide informed investment insights."
             //  ghLink="https://github.com/yourusername/iot-crowd-analyzer"
               // demoLink="https://demo-link-if-available.com/"
