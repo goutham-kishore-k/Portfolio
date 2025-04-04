@@ -58,9 +58,11 @@ function Home2() {
         </Row>
         <Row className="mb-5">
           <Col md={12} className="d-flex justify-content-center gap-4">
-            <a href="/about" className="purple-link">About</a>
-            <a href="/projects" className="purple-link">Projects</a>
-            <a href="#resume" className="purple-link">Resume</a>
+            Get to know more about me and the tools I worked on<a href="/about" className="purple-link">About</a>
+            <br />
+            See the i'm working on<a href="/projects" className="purple-link">Projects</a>
+            <br />
+            Find my Resume here!!!<a href="/resume" className="purple-link">Resume</a>
           </Col>
         </Row>
         <Row>
