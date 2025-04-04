@@ -5,7 +5,18 @@
   background-size: cover;
   position: relative;
 }
+.purple-link {
+  color: #6c63ff;
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 1.2em;
+  transition: all 0.3s ease;
+}
 
+.purple-link:hover {
+  color: #4a40c0;
+  transform: translateY(-2px);
+}
 .App-logo {
   height: 40vmin;
   pointer-events: none;

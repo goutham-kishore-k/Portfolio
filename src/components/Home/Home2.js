@@ -56,6 +56,13 @@ function Home2() {
             </Tilt>
           </Col>
         </Row>
+        <Row className="mb-5">
+          <Col md={12} className="d-flex justify-content-center gap-4">
+            <a href="/about" className="purple-link">About</a>
+            <a href="/projects" className="purple-link">Projects</a>
+            <a href="#resume" className="purple-link">Resume</a>
+          </Col>
+        </Row>
         <Row>
           <Col md={12} className="home-about-social">
             <h1>FIND ME ON</h1>
