@@ -58,11 +58,13 @@ function Home2() {
         </Row>
         <Row className="mb-5">
           <Col md={12} className="home-about-description">
+          <p className="home-about-body">
             Get to know more about me and the tools I worked on<a href="/about" className="purple-link">About</a>
             <br />
             See the i'm working on<a href="/projects" className="purple-link">Projects</a>
             <br />
             Find my Resume here!!!<a href="/resume" className="purple-link">Resume</a>
+            </p>
           </Col>
         </Row>
         <Row>
