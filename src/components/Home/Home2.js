@@ -60,13 +60,13 @@ function Home2() {
                 src={myImg}
                 className="img-fluid"
                 alt="avatar"
-                style={{ marginTop: "-68px" }}
+                style={{ marginTop: "-88px" }}
               />
             </Tilt>
           </Col>
         </Row>
         <Row className="mb-5">
-        <Col md={12} className="home-about-description">
+        <Col md={10} className="home-about-description">
           <p className="home-about-body">
             Curious to learn more about me and the tools I've worked with? Check out my <a href="/about" className="purple">About</a> page.
             <br />
