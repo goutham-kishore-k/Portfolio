@@ -5,6 +5,7 @@ import Particle from "../Particle";
 import creditCollections from "../../Assets/Projects/creditCollections.png";
 import iotCrowdAnalyzer from "../../Assets/Projects/iotCrowdAnalyzer.png";
 import Stock from "../../Assets/Projects/stock.png";
+import aio from "../../Assets/Projects/aio.png";
 
 function Projects() {
   return (
@@ -30,6 +31,14 @@ function Projects() {
               // demoLink="https://demo-link-if-available.com/"
             />
           </Col>
+          <Col md={6} className="project-card">
+            <ProjectCard
+              imgPath={aio}
+              isBlog={false}
+              title="Retail Sales Forecasting, Compass Group USA"
+              description="Built predictive models achieving 92% accuracy for monthly retail sales forecasting. Designed interactive Power BI dashboards for demand planning insights, enabling data-driven inventory and labor decisions across market locations."
+            />
+          </Col>
         </Row>
 
         <h2 className="project-subheading">Academic Projects</h2>
@@ -38,7 +47,15 @@ function Projects() {
             <ProjectCard
               imgPath={iotCrowdAnalyzer}
               isBlog={false}
-              title="IOT Based Crowd Analyzer Using Raspberry Pi (2021)"
+              title="ServiceNow Ticket Analytics & Predictive Assignment, UTA"
+              description="Led analysis of 3 years of ServiceNow data using Python and NLP (TF-IDF, transformers) to predict optimal assignment groups and reduce ticket reassignment rates. Developed interactive dashboards (Plotly, Power BI) revealing workflow inefficiencies and informing process optimization initiatives."
+            />
+          </Col>
+          <Col md={6} className="project-card">
+            <ProjectCard
+              imgPath={iotCrowdAnalyzer}
+              isBlog={false}
+              title="IOT Based Crowd Analyzer Using Raspberry Pi, UTA (2021)"
               description="This project utilizes the technique of passive Wi-Fi sensing using Tshark to determine the number of people present at the location where Raspberry Pi is placed. All such Raspberry Pi devices update their estimated crowd at their location to a MySQL database, which is retrieved by a webpage created using Flask to display the live crowd present at various locations to its users."
             //  ghLink="https://github.com/yourusername/iot-crowd-analyzer"
               // demoLink="https://demo-link-if-available.com/"
@@ -48,6 +65,14 @@ function Projects() {
 
         <h2 className="project-subheading">Personal Projects</h2>
         <Row style={{ justifyContent: "center", paddingBottom: "10px" }}>
+          <Col md={6} className="project-card">
+            <ProjectCard
+              imgPath={Stock}
+              isBlog={false}
+              title="AIO AI Operator Platform"
+              description="Architected production-grade AI platform delivering real-time insights, automated summaries, and performance metrics through event-driven architecture with TypeScript/Express backend (8+ REST endpoints). Developed React dashboard with interactive visualizations and secure Auth0 OAuth2/JWT authentication; deployed on Render/Vercel with production-ready error handling."
+            />
+          </Col>
           <Col md={6} className="project-card">
             <ProjectCard
               imgPath={Stock}

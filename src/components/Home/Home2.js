@@ -19,40 +19,49 @@ function Home2() {
               LET ME <span className="purple"> INTRODUCE </span> MYSELF
             </h1>
             <p className="home-about-body">
-            I fell in love with Data and have been on an exciting learning journey ever since... 🚀
+            I fell in love with Data Engineering and transforming raw data into actionable insights... 🚀
             <br />
-            <br />I am proficient in modern technologies like
+            <br />I am proficient in technologies like
             <i>
-              <b className="purple"> Python, JavaScript, and SQL </b>
+              <b className="purple"> Python, SQL, Scala, and Java </b>
             </i>
             <br />
             <br />
-            My fields of interest are developing 
+            My expertise includes building 
             <i>
-              <b className="purple">Data-Driven Applications </b> and
-              exploring areas related to{" "}
+              <b className="purple">Production-Grade Data Pipelines </b>
+              with{" "}
               <b className="purple">
-                Cybersecurity and Cloud Solutions
+                Apache NiFi and Kafka, 
+              </b>
+              engineering{" "}
+              <b className="purple">
+                ETL/ELT workflows across Oracle & PostgreSQL
               </b>
             </i>
             <br />
             <br />
-            I'm passionate about creating end-to-end solutions using <b className="purple">ETL pipelines</b> and
+            I deliver <b className="purple">Business Intelligence Solutions</b> using
             <i>
               <b className="purple">
                 {" "}
-                Analytics and Visualization tools
+                Tableau, Power BI, and Apache Superset
               </b>
             </i>
-            &nbsp; including
+            , with hands-on experience in
             <i>
-              <b className="purple"> Tableau, Power BI, and custom React.js dashboards</b>
+              <b className="purple"> ML/Analytics (scikit-learn, XGBoost, NLP) and AWS Cloud</b>
             </i>
           </p>
           </Col>
           <Col md={4} className="myAvtar">
             <Tilt>
-              <img src={myImg} className="img-fluid" alt="avatar" />
+              <img
+                src={myImg}
+                className="img-fluid"
+                alt="avatar"
+                style={{ marginTop: "-68px" }}
+              />
             </Tilt>
           </Col>
         </Row>
@@ -61,7 +70,7 @@ function Home2() {
           <p className="home-about-body">
             Curious to learn more about me and the tools I've worked with? Check out my <a href="/about" className="purple">About</a> page.
             <br />
-            Want to explore what I’m currently working on? Visit my <a href="/projects" className="purple">Projects</a>.
+            Want to explore what I'm currently working on? Visit my <a href="/project" className="purple">Projects</a>.
             <br />
             Looking for my professional details? Download my <a href="/resume" className="purple">Resume</a>.
           </p>
