@@ -3,9 +3,11 @@ import { Container, Row, Col } from "react-bootstrap";
 import ProjectCard from "./ProjectCards";
 import Particle from "../Particle";
 import creditCollections from "../../Assets/Projects/creditCollections.png";
-import iotCrowdAnalyzer from "../../Assets/Projects/iotCrowdAnalyzer.png";
+import iotCrowdAnalyzer from "../../Assets/Projects/iot.png";
+//import iotCrowdAnalyzer from "../../Assets/Projects/iotCrowdAnalyzer.png";
 import Stock from "../../Assets/Projects/stock.png";
 import aio from "../../Assets/Projects/aio.png";
+import uat_oit from "../../Assets/Projects/uta_oit.png";
 
 function Projects() {
   return (
@@ -33,7 +35,7 @@ function Projects() {
           </Col>
           <Col md={6} className="project-card">
             <ProjectCard
-              imgPath={aio}
+              imgPath={Stock}
               isBlog={false}
               title="Retail Sales Forecasting, Compass Group USA"
               description="Built predictive models achieving 92% accuracy for monthly retail sales forecasting. Designed interactive Power BI dashboards for demand planning insights, enabling data-driven inventory and labor decisions across market locations."
@@ -45,7 +47,7 @@ function Projects() {
         <Row style={{ justifyContent: "center", paddingBottom: "10px" }}>
           <Col md={6} className="project-card">
             <ProjectCard
-              imgPath={iotCrowdAnalyzer}
+              imgPath={uat_oit}
               isBlog={false}
               title="ServiceNow Ticket Analytics & Predictive Assignment, UTA"
               description="Led analysis of 3 years of ServiceNow data using Python and NLP (TF-IDF, transformers) to predict optimal assignment groups and reduce ticket reassignment rates. Developed interactive dashboards (Plotly, Power BI) revealing workflow inefficiencies and informing process optimization initiatives."
@@ -67,7 +69,7 @@ function Projects() {
         <Row style={{ justifyContent: "center", paddingBottom: "10px" }}>
           <Col md={6} className="project-card">
             <ProjectCard
-              imgPath={Stock}
+              imgPath={aio}
               isBlog={false}
               title="AIO AI Operator Platform"
               description="Architected production-grade AI platform delivering real-time insights, automated summaries, and performance metrics through event-driven architecture with TypeScript/Express backend (8+ REST endpoints). Developed React dashboard with interactive visualizations and secure Auth0 OAuth2/JWT authentication; deployed on Render/Vercel with production-ready error handling."
