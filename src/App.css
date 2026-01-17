@@ -5,6 +5,24 @@
   background-size: cover;
   position: relative;
 }
+
+/* Mobile-only sections - visible only on mobile devices */
+.mobile-only-sections {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .mobile-only-sections {
+    display: block;
+  }
+  
+  /* Hide redundant home sections on mobile */
+  .home-about-description,
+  .home-about-social {
+    display: none !important;
+  }
+}
+
 .purple-link {
   color: #6c63ff;
   text-decoration: none;

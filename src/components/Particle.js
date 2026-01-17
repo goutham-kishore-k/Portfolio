@@ -1,7 +1,11 @@
 import React from "react";
 import Particles from "react-tsparticles";
+import { useTheme } from "../context/ThemeContext";
 
 function Particle() {
+  const theme = useTheme();
+  const isLight = theme === "light";
+  
   return (
     <Particles
       id="tsparticles"
@@ -20,10 +24,13 @@ function Particle() {
           },
           move: {
             direction: "right",
-            speed: 0.05,
+            speed: 0.5,
           },
           size: {
             value: 1,
+          },
+          color: {
+            value: isLight ? "#506fc2" : "#ffffff",
           },
           opacity: {
             anim: {

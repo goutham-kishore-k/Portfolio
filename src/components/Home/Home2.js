@@ -45,10 +45,10 @@ function Home2() {
             <i>
               <b className="purple">
                 {" "}
-                Tableau, Power BI, and Apache Superset
+                Tableau, Power BI, and Apache Superset, 
               </b>
             </i>
-            , with hands-on experience in
+             with hands-on experience in
             <i>
               <b className="purple"> ML/Analytics (scikit-learn, XGBoost, NLP) and AWS Cloud</b>
             </i>

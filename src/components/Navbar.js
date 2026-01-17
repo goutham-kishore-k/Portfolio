@@ -14,11 +14,14 @@ import {
   AiOutlineUser,
 } from "react-icons/ai";
 
+import { BsSun, BsMoon } from "react-icons/bs";
+
 import { CgFileDocument } from "react-icons/cg";
 
-function NavBar() {
+function NavBar({ theme = "dark", onToggleTheme }) {
   const [expand, updateExpanded] = useState(false);
   const [navColour, updateNavbar] = useState(false);
+  const isLight = theme === "light";
 
   React.useEffect(() => {
     function scrollHandler() {
@@ -95,6 +98,20 @@ function NavBar() {
               </Nav.Link>
             </Nav.Item>
           </Nav>
+          <div className="theme-toggle-container">
+            <button
+              type="button"
+              className="theme-toggle-btn"
+              onClick={() => {
+                onToggleTheme?.();
+                updateExpanded(false);
+              }}
+              aria-label={isLight ? "Switch to dark mode" : "Switch to light mode"}
+            >
+              {isLight ? <BsMoon /> : <BsSun />}
+              <span className="theme-toggle-label">{isLight ? "Dark" : "Light"}</span>
+            </button>
+          </div>
         </Navbar.Collapse>
       </Container>
     </Navbar>

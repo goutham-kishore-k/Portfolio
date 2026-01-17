@@ -4,6 +4,10 @@ import homeLogo from "../../Assets/home-main.png";
 import Particle from "../Particle";
 import Home2 from "./Home2";
 import Type from "./Type";
+import AboutIntro from "../About/AboutIntro";
+import AboutSkills from "../About/AboutSkills";
+import Projects from "../Projects/Projects";
+import ResumeNew from "../Resume/ResumeNew";
 
 function Home() {
   return (
@@ -42,6 +46,14 @@ function Home() {
         </Container>
       </Container>
       <Home2 />
+      
+      {/* Mobile-only sections */}
+      <div className="mobile-only-sections">
+        <AboutIntro />
+        <Projects />
+        <ResumeNew />
+        <AboutSkills />
+      </div>
     </section>
   );
 }
