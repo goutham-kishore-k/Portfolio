@@ -46,10 +46,10 @@ button:focus {
 
 body.theme-light #preloader {
   background-color: #f7f1e6;
-  background-image: url(./Assets/pre.svg), url(./Assets/light-bg.jpg);
-  background-size: 120px, cover;
-  background-repeat: no-repeat, repeat;
-  background-position: center, center;
+  background-image: url(./Assets/pre.svg), linear-gradient(rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.9)), url(./Assets/light-bg.jpg);
+  background-size: 120px, cover, cover;
+  background-repeat: no-repeat, repeat, repeat;
+  background-position: center, center, center;
 }
 
 #preloader-none {
@@ -795,14 +795,14 @@ body.theme-light {
   --section-background-color: url(./Assets/light-bg.jpg);
   --image-gradient: url(./Assets/light-bg.jpg);
   --imp-text-color: #E50914;
-  background-image: url(./Assets/light-bg.jpg);
+  background-image: linear-gradient(rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.9)), url(./Assets/light-bg.jpg);
   background-repeat: repeat;
   background-size: cover;
   color: #1f1f1f;
 }
 
 body.theme-light .App {
-  background-image: url(./Assets/light-bg.jpg);
+  background-image: linear-gradient(rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.9)), url(./Assets/light-bg.jpg);
   background-repeat: repeat;
   background-size: cover;
   background-attachment: fixed;
@@ -850,7 +850,7 @@ body.theme-light .home-section,
 body.theme-light .project-section,
 body.theme-light .about-section,
 body.theme-light .resume-section {
-  background-image: url(./Assets/light-bg.jpg) !important;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.9)), url(./Assets/light-bg.jpg) !important;
   background-repeat: repeat !important;
   background-size: cover !important;
 }
