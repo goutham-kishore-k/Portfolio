@@ -3,9 +3,8 @@
 .env.development
 .env.test
 
-# Source files (will be built)
+# Source files (will be built, but keep public/ as it's needed for build)
 src/
-public/
 
 # Development dependencies and tools
 node_modules/
@@ -35,3 +34,4 @@ dist/
 
 # Documentation
 README.md
+
