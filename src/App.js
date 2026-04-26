@@ -7,6 +7,7 @@ import Projects from "./components/Projects/Projects";
 import Footer from "./components/Footer";
 import Resume from "./components/Resume/ResumeNew";
 import ChatBot from "./components/chatBot";
+import AIChat from "./components/AIChat";
 import { ThemeProvider } from "./context/ThemeContext";
 
 import {
@@ -60,6 +61,7 @@ function App() {
             <Route path="/chatBot" element={<ChatBot />} />
             <Route path="*" element={<Navigate to="/"/>} />
           </Routes>
+          <AIChat />
           <Footer />
         </div>
       </ThemeProvider>

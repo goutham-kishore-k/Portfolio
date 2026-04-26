@@ -36,13 +36,18 @@ function ResumeNew() {
             <AiOutlineDownload />
             &nbsp;Download CV
           </Button>
-          <Button
-            variant="outline-danger"
-            onClick={() => setIsTwoPage((prev) => !prev)}
-            style={{ maxWidth: "250px" }}
-          >
-            {isTwoPage ? "1-Page Resume" : "2-Page Resume"}
-          </Button>
+          <div className="resume-toggle-container">
+            <span className="resume-toggle-label">1-Page</span>
+            <input
+              type="checkbox"
+              id="resume-toggle"
+              className="resume-toggle-switch"
+              checked={isTwoPage}
+              onChange={() => setIsTwoPage((prev) => !prev)}
+            />
+            <label htmlFor="resume-toggle" className="resume-toggle-slider"></label>
+            <span className="resume-toggle-label">2-Page</span>
+          </div>
         </Row>
 
         <Row className="resume">

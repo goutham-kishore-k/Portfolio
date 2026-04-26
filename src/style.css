@@ -847,10 +847,11 @@ body.theme-light .theme-toggle-btn:hover {
 }
 
 body.theme-light .home-section,
+body.theme-light .home-section1,
 body.theme-light .project-section,
 body.theme-light .about-section,
 body.theme-light .resume-section {
-  background-image: linear-gradient(rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.9)), url(./Assets/light-bg.jpg) !important;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0.75)), url(./Assets/light-bg.jpg) !important;
   background-repeat: repeat !important;
   background-size: cover !important;
 }
@@ -942,4 +943,85 @@ body.theme-light .project-subheading {
 body.theme-light .card-img-top,
 body.theme-light .blog-img {
   opacity: 1 !important;
+}
+
+/* --------- */
+/* Resume Toggle Switch */
+/* --------- */
+.resume-toggle-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0.5rem 0.75rem;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.resume-toggle-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: white;
+  user-select: none;
+}
+
+.resume-toggle-switch {
+  display: none;
+}
+
+.resume-toggle-slider {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 24px;
+  background-color: rgba(255, 255, 255, 0.3);
+  border-radius: 24px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin: 0 4px;
+}
+
+.resume-toggle-slider::before {
+  content: "";
+  position: absolute;
+  height: 20px;
+  width: 20px;
+  left: 2px;
+  bottom: 2px;
+  background-color: white;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.resume-toggle-switch:checked + .resume-toggle-slider {
+  background-color: #E50914;
+}
+
+.resume-toggle-switch:checked + .resume-toggle-slider::before {
+  transform: translateX(26px);
+}
+
+body.theme-light .resume-toggle-container {
+  background: rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+body.theme-light .resume-toggle-label {
+  color: #1f1f1f;
+}
+
+body.theme-light .resume-toggle-slider {
+  background-color: rgba(0, 0, 0, 0.15);
+}
+
+body.theme-light .resume-toggle-slider::before {
+  background-color: #1f1f1f;
+}
+
+body.theme-light .resume-toggle-switch:checked + .resume-toggle-slider {
+  background-color: #E50914;
+}
+
+body.theme-light .resume-toggle-switch:checked + .resume-toggle-slider::before {
+  background-color: white;
 }

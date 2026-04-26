@@ -15,7 +15,7 @@ function Particle() {
             value: 160,
             density: {
               enable: true,
-              value_area: 1500,
+              value_area: isLight ? 2000 : 1500,
             },
           },
           line_linked: {
