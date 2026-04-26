@@ -3,9 +3,6 @@
 .env.development
 .env.test
 
-# Source files (will be built, but keep public/ as it's needed for build)
-src/
-
 # Development dependencies and tools
 node_modules/
 npm-debug.log
@@ -28,10 +25,11 @@ coverage/
 __tests__/
 *.test.js
 
-# Build artifacts (keep the build/ directory only)
+# Build artifacts
 .cache/
 dist/
 
 # Documentation
 README.md
+
 
