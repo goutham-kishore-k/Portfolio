@@ -1,4 +1,7 @@
 {
+  "buildCommand": "npm run build",
+  "devCommand": "npm run start:with-server",
+  "installCommand": "npm ci",
   "rewrites": [
     {
       "source": "/api/(.*)",

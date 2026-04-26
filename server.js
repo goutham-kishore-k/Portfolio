@@ -19,6 +19,17 @@ app.use(express.json({ limit: '10mb' }));
 app.use(fileUpload());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// Serve React build files in production
+if (process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV) {
+  app.use(express.static(path.join(__dirname, 'build')));
+  // SPA routing: Redirect non-API requests to index.html
+  app.get('*', (req, res) => {
+    if (!req.path.startsWith('/api/')) {
+      res.sendFile(path.join(__dirname, 'build', 'index.html'));
+    }
+  });
+}
+
 const isLocalEnv = !process.env.VERCEL_ENV && process.env.NODE_ENV !== 'production';
 const LOCAL_DATA_PATH = path.join(__dirname, 'portfolio_data.json');
 

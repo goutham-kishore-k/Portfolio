@@ -1,0 +1,37 @@
+# Local development files
+.env.local
+.env.development
+.env.test
+
+# Source files (will be built)
+src/
+public/
+
+# Development dependencies and tools
+node_modules/
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+.git/
+.gitignore
+.DS_Store
+.npm
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+coverage/
+__tests__/
+*.test.js
+
+# Build artifacts (keep the build/ directory only)
+.cache/
+dist/
+
+# Documentation
+README.md
