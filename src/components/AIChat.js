@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useContext } from "react";
 import {
   AiOutlineMessage,
   AiOutlineSend,
@@ -9,11 +9,14 @@ import {
   AiOutlineFileText,
 } from "react-icons/ai";
 import { FiGithub } from "react-icons/fi";
+import { PortfolioContext } from "../context/PortfolioContext";
 import pdfOnePage from "../Assets/GOUTHAM_RESUME.pdf";
 import pdfTwoPage from "../Assets/GOUTHAM_RESUME_2.pdf";
 
 const AIChat = () => {
+  const { data, activeProfile } = useContext(PortfolioContext);
   const [isOpen, setIsOpen] = useState(false);
+  const [sessionId, setSessionId] = useState(null);
   const [messages, setMessages] = useState([
     {
       id: "ai-1",
@@ -44,6 +47,24 @@ const AIChat = () => {
     }
   }, [messages]);
 
+  useEffect(() => {
+    // Start a fresh chat session when profile changes to avoid persona crossover.
+    setSessionId(null);
+    setMessages([
+      {
+        id: "ai-1",
+        type: "ai",
+        content: `Hi, I am ${activeProfile?.name || "Goutham"}'s AI assistant. Ask me about this profile's experience, skills, and projects.`,
+        suggestions: [
+          "Summarize his experience",
+          "Show recent projects",
+          "What impact has he delivered?",
+          "Download 1-page resume",
+        ],
+      },
+    ]);
+  }, [activeProfile?.id]);
+
   const quickActions = useMemo(
     () => [
       { key: "resume1", label: "1-Page Resume", icon: <AiOutlineDownload /> },
@@ -72,13 +93,17 @@ const AIChat = () => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
 
-      const apiBase = `${window.location.protocol}//${window.location.hostname}:5000`;
+      const apiBase = process.env.NODE_ENV === "development" ? "http://localhost:5000" : "";
       const response = await fetch(`${apiBase}/api/chat`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ message: content }),
+        body: JSON.stringify({ 
+          message: content,
+          activeProfileId: activeProfile?.id || data?.activeProfileId,
+          sessionId,
+        }),
         signal: controller.signal,
       });
 
@@ -88,16 +113,20 @@ const AIChat = () => {
         throw new Error(`HTTP ${response.status}: ${await response.text()}`);
       }
 
-      const data = await response.json();
-      
-      if (!data.reply) {
-        throw new Error("No reply in response: " + JSON.stringify(data));
+      const responseData = await response.json();
+
+      if (!responseData.reply) {
+        throw new Error("No reply in response: " + JSON.stringify(responseData));
+      }
+
+      if (responseData.sessionId) {
+        setSessionId(responseData.sessionId);
       }
 
       const aiMessage = {
         id: `ai-${Date.now()}`,
         type: "ai",
-        content: data.reply,
+        content: responseData.reply,
         suggestions: [
           "Tell me more about your experience",
           "Show recent projects",

@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useContext } from "react";
 import { Container, Row, Col } from "react-bootstrap";
+import { PortfolioContext } from "../../context/PortfolioContext";
 import myImg from "../../Assets/avatar.png";
 import Tilt from "react-parallax-tilt";
 import {
@@ -9,7 +10,61 @@ import {
 } from "react-icons/ai";
 import { FaLinkedinIn } from "react-icons/fa";
 
+const DEFAULT_KEYWORDS = [
+  "Data Engineering",
+  "Python",
+  "SQL",
+  "Scala",
+  "Java",
+  "Apache NiFi",
+  "Kafka",
+  "ETL",
+  "ELT",
+  "Oracle",
+  "PostgreSQL",
+  "Tableau",
+  "Power BI",
+  "Apache Superset",
+  "ML",
+  "Analytics",
+  "AWS",
+];
+
+const stripHtml = (value = "") => value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+
+const highlightKeywords = (text, keywords) => {
+  const uniqueKeywords = [...new Set(keywords.filter(Boolean))].sort((a, b) => b.length - a.length);
+  if (!text || uniqueKeywords.length === 0) return text;
+
+  const keywordLookup = new Set(uniqueKeywords.map((keyword) => keyword.toLowerCase()));
+  const escapedKeywords = uniqueKeywords.map((keyword) => keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const regex = new RegExp(`(${escapedKeywords.join("|")})`, "gi");
+
+  return text.split(regex).map((segment, index) => {
+    if (keywordLookup.has(segment.toLowerCase())) {
+      return (
+        <span key={`${segment}-${index}`} className="purple" style={{ fontWeight: 700 }}>
+          {segment}
+        </span>
+      );
+    }
+    return segment;
+  });
+};
+
 function Home2() {
+  const { activeProfile } = useContext(PortfolioContext);
+  const introBio = activeProfile?.experienceBio?.trim();
+  const projects = activeProfile?.projects || [];
+  const summaryText = introBio
+    ? stripHtml(introBio)
+    : "I fell in love with Data Engineering and transforming raw data into actionable insights. I build production-grade pipelines, ETL/ELT workflows, and analytics solutions that turn data into decisions.";
+  const shortSummary = summaryText.length > 260 ? `${summaryText.slice(0, 260).trim()}...` : summaryText;
+  const highlightedSummary = highlightKeywords(shortSummary, [
+    ...DEFAULT_KEYWORDS,
+    ...(activeProfile?.roles || []),
+  ]);
+
   return (
     <Container fluid className="home-about-section" id="about">
       <Container>
@@ -18,49 +73,20 @@ function Home2() {
             <h1 style={{ fontSize: "2.6em" }}>
               LET ME <span className="purple"> INTRODUCE </span> MYSELF
             </h1>
-            <p className="home-about-body">
-            I fell in love with Data Engineering and transforming raw data into actionable insights... 🚀
-            <br />
-            <br />I am proficient in technologies like
-            <i>
-              <b className="purple"> Python, SQL, Scala, and Java </b>
-            </i>
-            <br />
-            <br />
-            My expertise includes building 
-            <i>
-              <b className="purple">Production-Grade Data Pipelines </b>
-              with{" "}
-              <b className="purple">
-                Apache NiFi and Kafka, 
-              </b>
-              engineering{" "}
-              <b className="purple">
-                ETL/ELT workflows across Oracle & PostgreSQL
-              </b>
-            </i>
-            <br />
-            <br />
-            I deliver <b className="purple">Business Intelligence Solutions</b> using
-            <i>
-              <b className="purple">
-                {" "}
-                Tableau, Power BI, and Apache Superset, 
-              </b>
-            </i>
-             with hands-on experience in
-            <i>
-              <b className="purple"> ML/Analytics (scikit-learn, XGBoost, NLP) and AWS Cloud</b>
-            </i>
-          </p>
+            <p className="home-about-body" style={{ lineHeight: 1.8 }}>
+              {highlightedSummary}
+            </p>
+            <p className="home-about-body" style={{ marginTop: "18px", opacity: 0.95 }}>
+              Focus areas: <b className="purple">{(activeProfile?.roles || ["Data Engineer"]).join(" · ")}</b>
+            </p>
           </Col>
           <Col md={4} className="myAvtar">
             <Tilt>
               <img
-                src={myImg}
+                src={activeProfile?.avatarUrl || myImg}
                 className="img-fluid"
                 alt="avatar"
-                style={{ marginTop: "-88px" }}
+                style={activeProfile?.avatarUrl ? { maxHeight: "400px", borderRadius: "50%", marginTop: "-40px" } : { marginTop: "-88px" }}
               />
             </Tilt>
           </Col>
@@ -76,6 +102,35 @@ function Home2() {
           </p>
         </Col>
         </Row>
+
+        {projects.length > 0 && (
+          <Row className="mb-5">
+            <Col md={12} className="home-about-description">
+              <h2 style={{ fontSize: "2.1em", marginBottom: "20px" }}>
+                Featured <span className="purple">Projects</span>
+              </h2>
+              <div className="d-flex flex-column gap-3">
+                {projects.slice(0, 3).map((project, index) => (
+                  <div
+                    key={project.title || index}
+                    style={{
+                      padding: "18px 22px",
+                      borderRadius: "16px",
+                      background: "rgba(255,255,255,0.04)",
+                      border: "1px solid rgba(255,255,255,0.08)",
+                    }}
+                  >
+                    <h4 style={{ color: "white", marginBottom: "8px" }}>{project.title}</h4>
+                    <p style={{ color: "#c9d1d9", marginBottom: 0, textAlign: "justify" }}>
+                      {project.description}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </Col>
+          </Row>
+        )}
+
         <Row>
           <Col md={12} className="home-about-social">
             <h1>FIND ME ON</h1>

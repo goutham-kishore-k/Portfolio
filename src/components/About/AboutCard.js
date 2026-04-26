@@ -1,34 +1,60 @@
-import React from "react";
+import React, { useContext } from "react";
 import Card from "react-bootstrap/Card";
 import { ImPointRight } from "react-icons/im";
+import { PortfolioContext } from "../../context/PortfolioContext";
 
 function AboutCard() {
+  const { activeProfile } = useContext(PortfolioContext);
+  const summary = activeProfile?.experienceBio;
+  const summaryTitle = activeProfile?.name || "Professional Summary";
+  const roles = activeProfile?.roles || [];
+
   return (
     <Card className="quote-card-view">
-      <Card.Body>
+      <Card.Body style={{ padding: "34px 34px 24px" }}>
         <blockquote className="blockquote mb-0">
-          <p style={{ textAlign: "justify" }}>
-            Hi Everyone, I am <span className="purple">Goutham Kishore Krishnamoorthy </span>
-            from <span className="purple"> Dallas, TX.</span>
-            <br />
-            I'm a <span className="purple">Data Engineer</span> with 4+ years of experience designing, building, 
-            and maintaining production-grade data pipelines, ETL/ELT workflows, and business intelligence solutions. 
-            Recently completed my <span className="purple"> Master's in Data Science from UT Arlington</span> (GPA: 3.8/4.0).
-            <br />
-            <br />
-            With experience at <span className="purple">Compass Group USA</span> and <span className="purple">CGI</span>, 
-            I specialize in Apache NiFi, SQL (Oracle, PostgreSQL), Python, and cloud platforms. I've delivered 
-            measurable impact including 15% reduction in stockouts through demand forecasting and 40% reduction 
-            in manual processing through pipeline automation.
-            <br />
-            <br />
-            I'm passionate about translating complex business requirements into analytics-ready datasets, 
-            supporting ML initiatives, and delivering data-driven insights that enable strategic decision-making.
-            <br />
-            <br />
-            other interests 😋:
-          </p>
-          <ul>
+          {summary ? (
+            <>
+              <h2 style={{ color: "white", fontSize: "2.2rem", marginBottom: "14px" }}>{summaryTitle}</h2>
+              {roles.length > 0 && (
+                <p style={{ color: "#c770f0", fontSize: "1rem", marginBottom: "22px", fontWeight: 600 }}>
+                  {roles.join(" · ")}
+                </p>
+              )}
+              <div
+                style={{
+                  textAlign: "justify",
+                  fontSize: "1.12rem",
+                  lineHeight: 1.95,
+                  color: "#e6edf3",
+                }}
+                dangerouslySetInnerHTML={{ __html: summary }}
+              />
+            </>
+          ) : (
+            <p style={{ textAlign: "justify", fontSize: "1.12rem", lineHeight: 1.95 }}>
+              Hi Everyone, I am <span className="purple">Goutham Kishore Krishnamoorthy </span>
+              from <span className="purple"> Dallas, TX.</span>
+              <br />
+              I'm a <span className="purple">Data Engineer</span> with 4+ years of experience designing, building, 
+              and maintaining production-grade data pipelines, ETL/ELT workflows, and business intelligence solutions. 
+              Recently completed my <span className="purple"> Master's in Data Science from UT Arlington</span> (GPA: 3.8/4.0).
+              <br />
+              <br />
+              With experience at <span className="purple">Compass Group USA</span> and <span className="purple">CGI</span>, 
+              I specialize in Apache NiFi, SQL (Oracle, PostgreSQL), Python, and cloud platforms. I've delivered 
+              measurable impact including 15% reduction in stockouts through demand forecasting and 40% reduction 
+              in manual processing through pipeline automation.
+              <br />
+              <br />
+              I'm passionate about translating complex business requirements into analytics-ready datasets, 
+              supporting ML initiatives, and delivering data-driven insights that enable strategic decision-making.
+              <br />
+              <br />
+              other interests 😋:
+            </p>
+          )}
+          <ul style={{ marginTop: "22px" }}>
             <li className="about-activity">
               <ImPointRight /> Playing Outdoor Games
             </li>
@@ -40,7 +66,7 @@ function AboutCard() {
             </li>
           </ul>
 
-          <p style={{ color: "rgb(155 126 172)" }}>
+          <p style={{ color: "rgb(155 126 172)", marginTop: "18px" }}>
             "It is always IMpossible until it's DONE!"{" "}
           </p>
           <footer className="blockquote-footer">Goutham</footer>

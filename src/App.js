@@ -9,6 +9,9 @@ import Resume from "./components/Resume/ResumeNew";
 import ChatBot from "./components/chatBot";
 import AIChat from "./components/AIChat";
 import { ThemeProvider } from "./context/ThemeContext";
+import { PortfolioProvider } from "./context/PortfolioContext";
+import { Auth0ProviderWithNavigate } from "./context/Auth0ProviderWithNavigate";
+import AdminDashboard from "./components/Admin/AdminDashboard";
 
 import {
   BrowserRouter as Router,
@@ -48,8 +51,10 @@ function App() {
 
   return (
     <Router>
-      <ThemeProvider theme={theme}>
-        <Preloader load={load} />
+      <Auth0ProviderWithNavigate>
+        <PortfolioProvider>
+          <ThemeProvider theme={theme}>
+            <Preloader load={load} />
         <div className="App" id={load ? "no-scroll" : "scroll"}>
           <Navbar theme={theme} onToggleTheme={toggleTheme} />
           <ScrollToTop />
@@ -59,12 +64,16 @@ function App() {
             <Route path="/about" element={<About />} />
             <Route path="/resume" element={<Resume />} />
             <Route path="/chatBot" element={<ChatBot />} />
+            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/callback" element={<div style={{ paddingTop: '100px', textAlign: 'center', color: 'white' }}>Authenticating...</div>} />
             <Route path="*" element={<Navigate to="/"/>} />
           </Routes>
           <AIChat />
           <Footer />
         </div>
       </ThemeProvider>
+        </PortfolioProvider>
+      </Auth0ProviderWithNavigate>
     </Router>
   );
 }

@@ -1,0 +1,109 @@
+{
+  "activeProfileId": "profile-1777199946610",
+  "profiles": [
+    {
+      "id": "default-1",
+      "name": "Data Engineer",
+      "roles": [
+        "Data Scientist",
+        "Data Engineer",
+        "Full Stack Developer"
+      ],
+      "avatarUrl": "",
+      "resumeUrl": "",
+      "experienceBio": "",
+      "projects": [],
+      "systemPrompt": "You are Goutham's AI assistant. Answer questions about his 4+ years of data engineering experience, projects, skills in Apache NiFi, Kafka, Python, SQL, Power BI, and Tableau. Be professional, concise, and default to 80-120 words unless the user asks for more detail.",
+      "resumeText": ""
+    },
+    {
+      "id": "profile-1777196947661",
+      "name": "Full Stack",
+      "roles": [
+        "Lead Full Stack Java Developer",
+        "Software Developer II - FullStack"
+      ],
+      "avatarUrl": "",
+      "resumeUrl": "http://localhost:5000/uploads/1777196960380-GouthamKishore_Resume.pdf",
+      "systemPrompt": "You are an AI assistant for Goutham, a Lead Full Stack Java Developer. Answer questions about his 8+ years of experience in enterprise Java development, Spring ecosystem, microservices, event-driven architecture, and cloud platforms. Emphasize his backend expertise, system design skills, and leadership experience. Be professional, concise, and default to 80-120 words unless the user asks for more detail.",
+      "experienceBio": "<p>Goutham Kishore Krishnamoorthy is a Lead FullStack Java Developer with over 8 years of experience designing and delivering enterprise-scale web applications and backend systems across E-commerce, Healthcare, and Financial Services domains, serving millions of users.</p><p>He has managed the full Software Development Life Cycle (SDLC) from requirements gathering and system design through development, integration, testing, deployment, and production support within Agile/Scrum frameworks. His deep expertise spans Core Java, the Spring ecosystem (SpringBoot, SpringMVC, SpringCloud, Spring Security), and frontend technologies including Angular and React with Redux.</p><p>Goutham has extensive experience with cloud platforms (AWS, Azure, GCP), CI/CD pipelines (Jenkins, Docker, Kubernetes), microservices architecture, event-driven design using Apache Kafka, and database technologies including MySQL, PostgreSQL, MongoDB, and Redis. He has led teams of developers, conducted code reviews, and mentored junior engineers while collaborating with business stakeholders to deliver scalable technical solutions.</p>",
+      "projects": [
+        {
+          "title": "E-Commerce Marketplace Backend Services",
+          "description": "Designed and developed scalable backend services using Java8 with Streams and Lambda expressions, improving code readability and reducing processing latency by 20-25%. Architected SpringBoot-based microservices supporting listing lifecycle management, seller onboarding, order tracking, and post-purchase operations.",
+          "imgPath": "",
+          "isWork": true
+        },
+        {
+          "title": "Marketplace Transaction Workflows",
+          "description": "Built and enhanced marketplace transaction workflows covering buyer checkout, seller order processing, dynamic pricing rules, and fulfillment integrations. Implemented RESTful APIs handling millions of daily marketplace requests with consistent sub-second response times.",
+          "imgPath": "",
+          "isWork": true
+        },
+        {
+          "title": "Event-Driven Architecture with Apache Kafka",
+          "description": "Integrated Apache Kafka for event-driven workflows processing order updates, listing changes, and seller activity events at scale, improving system decoupling and fault tolerance. Led data migration initiatives reducing data inconsistency issues by over 30%.",
+          "imgPath": "",
+          "isWork": true
+        },
+        {
+          "title": "Credit Card Payment Platform",
+          "description": "Worked on the Credit Card platform supporting customer enrollment, transaction authorization, rewards processing, and payment validation workflows for millions of customers. Designed backend services integrating Amazon Checkout systems and payment gateways for secure, low-latency payment processing.",
+          "imgPath": "",
+          "isWork": true
+        }
+      ],
+      "resumeText": ""
+    },
+    {
+      "id": "profile-1777199946610",
+      "name": "Backend",
+      "roles": [
+        "Lead Java Backend Developer",
+        "Java Backend Developer"
+      ],
+      "avatarUrl": "",
+      "resumeUrl": "http://localhost:5000/uploads/1777199969887-Goutham_Kishore_Krishnamoorthy_Java_Backend.pdf",
+      "experienceBio": "<p><strong>Goutham Kishore Krishnamoorthy</strong> is a Senior Java Backend Developer with over 7 years of experience designing and building scalable, high-throughput distributed systems and enterprise backend services.</p><p>He has deep expertise in the Spring ecosystem (SpringBoot, Spring MVC, Spring Security, Spring Data JPA, Spring Batch) applied to production-grade backend systems handling real-time data and high-volume transactional workloads. His experience spans event-driven architecture using Apache Kafka, RESTful API design, ORM optimization with Hibernate/JPA, and database engineering across PostgreSQL and MongoDB.</p><p>Goutham has worked with leading financial and enterprise organizations including Oracle Corporation and CitiBank, building microservices for enterprise SaaS platforms, retail banking systems, payment processing, and billing infrastructure. He demonstrates strong skills in Redis caching patterns, JVM performance profiling, CI/CD pipelines, and mentoring junior engineers.</p>",
+      "projects": [
+        {
+          "title": "Oracle Enterprise SaaS Microservices Platform",
+          "description": "Architected and built a suite of Spring Boot microservices supporting Oracle's enterprise SaaS platform with tenant management, entitlement workflows, billing events, and usage metering. Implemented API Gateway pattern with Spring Cloud Gateway for dynamic routing, rate limiting, JWT validation, and circuit breaking.",
+          "imgPath": "",
+          "isWork": true
+        },
+        {
+          "title": "Kafka Event Pipelines for Billing",
+          "description": "Designed and operated Kafka-based event pipelines handling millions of events daily with sub-second consumer lag. Implemented exactly-once semantics for billing-critical flows, consumer group architectures with partition strategies, and DLQ workflows with automated retry and backfill replay mechanisms.",
+          "imgPath": "",
+          "isWork": true
+        },
+        {
+          "title": "PostgreSQL Persistence Layer Optimization",
+          "description": "Owned full persistence layer design for PostgreSQL-backed services including ER modeling, index strategy (B-tree, composite, partial), and connection pool tuning. Resolved systemic N+1 query problems using EntityGraph annotations and batch fetch configuration, reducing database roundtrips by over 60%.",
+          "imgPath": "",
+          "isWork": true
+        },
+        {
+          "title": "Multi-layer Redis Caching Architecture",
+          "description": "Implemented multi-layer Redis caching using cache-aside pattern for tenant context, entitlement lookups, and rate limit counters. Achieved over 70% cache hit rate and reduced P99 API latency by 35%. Used Redis distributed locking via Redisson to serialize concurrent writes during high-volume operations.",
+          "imgPath": "",
+          "isWork": true
+        }
+      ],
+      "systemPrompt": "You are Goutham's AI assistant for his Java Backend profile. Answer only questions related to his backend engineering experience, SpringBoot microservices, Kafka event-driven systems, PostgreSQL/MongoDB data design, Redis caching, CI/CD, and enterprise project impact. If a question is unrelated to his profile, politely refuse and ask the user to ask about Goutham's professional background.",
+      "resumeText": ""
+    }
+  ],
+  "menuVisibility": {
+    "Home": true,
+    "About": true,
+    "Projects": true,
+    "Resume": true
+  },
+  "chatbot": {
+    "apiKey": "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",
+    "model": "minimax/minimax-m2.5:free",
+    "systemPrompt": "You are Goutham's AI assistant. Answer questions about his 4+ years of data engineering experience, projects, skills in Apache NiFi, Kafka, Python, SQL, Power BI, and Tableau. Be professional, concise, and default to 80-120 words unless the user asks for more detail."
+  }
+}

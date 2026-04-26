@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
 import Navbar from "react-bootstrap/Navbar";
 import Nav from "react-bootstrap/Nav";
 import Container from "react-bootstrap/Container";
+import { PortfolioContext } from "../context/PortfolioContext";
 import logo from "../Assets/logo.png";
 //import Button from "react-bootstrap/Button";
 import { Link } from "react-router-dom";
@@ -20,6 +21,7 @@ import { CgFileDocument } from "react-icons/cg";
 function NavBar({ theme = "dark", onToggleTheme }) {
   const [expand, updateExpanded] = useState(false);
   const [navColour, updateNavbar] = useState(false);
+  const { data } = useContext(PortfolioContext);
   const isLight = theme === "light";
 
   React.useEffect(() => {
@@ -58,44 +60,41 @@ function NavBar({ theme = "dark", onToggleTheme }) {
         </Navbar.Toggle>
         <Navbar.Collapse id="responsive-navbar-nav">
           <Nav className="ms-auto" defaultActiveKey="#home">
-            <Nav.Item>
-              <Nav.Link as={Link} to="/" onClick={() => updateExpanded(false)}>
-                <AiOutlineHome style={{ marginBottom: "2px" }} /> Home
-              </Nav.Link>
-            </Nav.Item>
+            {data?.menuVisibility?.Home !== false && (
+              <Nav.Item>
+                <Nav.Link as={Link} to="/" onClick={() => updateExpanded(false)}>
+                  <AiOutlineHome style={{ marginBottom: "2px" }} /> Home
+                </Nav.Link>
+              </Nav.Item>
+            )}
 
-            <Nav.Item>
-              <Nav.Link
-                as={Link}
-                to="/about"
-                onClick={() => updateExpanded(false)}
-              >
-                <AiOutlineUser style={{ marginBottom: "2px" }} /> About
-              </Nav.Link>
-            </Nav.Item>
+            {data?.menuVisibility?.About !== false && (
+              <Nav.Item>
+                <Nav.Link as={Link} to="/about" onClick={() => updateExpanded(false)}>
+                  <AiOutlineUser style={{ marginBottom: "2px" }} /> About
+                </Nav.Link>
+              </Nav.Item>
+            )}
 
-            <Nav.Item>
-              <Nav.Link
-                as={Link}
-                to="/project"
-                onClick={() => updateExpanded(false)}
-              >
-                <AiOutlineFundProjectionScreen
-                  style={{ marginBottom: "2px" }}
-                />{" "}
-                Projects
-              </Nav.Link>
-            </Nav.Item>
+            {data?.menuVisibility?.Projects !== false && (
+              <Nav.Item>
+                <Nav.Link as={Link} to="/project" onClick={() => updateExpanded(false)}>
+                  <AiOutlineFundProjectionScreen style={{ marginBottom: "2px" }} />{" "}
+                  Projects
+                </Nav.Link>
+              </Nav.Item>
+            )}
 
-            <Nav.Item>
-              <Nav.Link
-                as={Link}
-                to="/resume"
-                onClick={() => updateExpanded(false)}
-              >
-                <CgFileDocument style={{ marginBottom: "2px" }} /> Resume
-              </Nav.Link>
-            </Nav.Item>
+            {data?.menuVisibility?.Resume !== false && (
+              <Nav.Item>
+                <Nav.Link as={Link} to="/resume" onClick={() => updateExpanded(false)}>
+                  <CgFileDocument style={{ marginBottom: "2px" }} /> Resume
+                </Nav.Link>
+              </Nav.Item>
+            )}
+            
+            {/* Added an Admin Link visible only when logged in or just unconditionally as a small link, or hide it. 
+                Usually admin dashboards are accessed by directly going to /admin. We'll leave it out of main nav for public viewers. */}
           </Nav>
           <div className="theme-toggle-container">
             <button
