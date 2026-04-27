@@ -3,7 +3,8 @@ const cors = require("cors");
 const path = require("path");
 const fs = require("fs");
 require("dotenv").config({ path: path.join(__dirname, ".env.local") });
-const { put, list } = require('@vercel/blob');
+const { put, list, get } = require('@vercel/blob');
+const { Readable } = require('stream');
 const fileUpload = require('express-fileupload');
 const pdfParse = require('pdf-parse');
 
@@ -111,7 +112,7 @@ const pruneExpiredChatSessions = () => {
 };
 
 // Cache for Vercel Blob URL to avoid slow list() calls on every request
-let cachedBlobUrl = null;
+let cachedBlobPathname = null;
 let cacheExpiresAt = 0;
 
 const readBundledPortfolioData = () => {
@@ -131,8 +132,8 @@ const readBundledPortfolioData = () => {
 
 const getCachedBlobUrl = async () => {
   const now = Date.now();
-  if (cachedBlobUrl && now < cacheExpiresAt) {
-    return cachedBlobUrl;
+  if (cachedBlobPathname && now < cacheExpiresAt) {
+    return cachedBlobPathname;
   }
 
   try {
@@ -146,14 +147,48 @@ const getCachedBlobUrl = async () => {
     clearTimeout(timeoutId);
     
     if (blobs.length > 0) {
-      cachedBlobUrl = blobs[0].url;
+      // store pathname so we can use `get()` server-side for private blobs
+      cachedBlobPathname = blobs[0].pathname || blobs[0].path || null;
       cacheExpiresAt = now + 60000; // Cache for 1 minute
-      return cachedBlobUrl;
+      return cachedBlobPathname;
     }
   } catch (error) {
     console.log("Failed to fetch blob URL:", error.message);
   }
   return null;
+};
+
+// Helper: convert various kinds of streams to string
+const streamToString = async (stream) => {
+  if (!stream) return '';
+  // Node.js Readable
+  if (stream instanceof Readable) {
+    return await new Promise((resolve, reject) => {
+      const chunks = [];
+      stream.on('data', (c) => chunks.push(Buffer.isBuffer(c) ? c : Buffer.from(c)));
+      stream.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+      stream.on('error', reject);
+    });
+  }
+
+  // Web ReadableStream
+  if (typeof stream.getReader === 'function') {
+    const reader = stream.getReader();
+    const chunks = [];
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(Buffer.from(value));
+    }
+    return Buffer.concat(chunks).toString('utf8');
+  }
+
+  // Fallback: try to stringify
+  try {
+    return String(stream);
+  } catch (e) {
+    return '';
+  }
 };
 
 const buildProfileSystemPrompt = (portfolioData, activeProfileId) => {
@@ -236,18 +271,19 @@ async function getPortfolioData() {
       return readBundledPortfolioData();
     }
 
-    // Try to get blob URL from cache or list
-    const blobUrl = await getCachedBlobUrl();
-    if (blobUrl) {
+    // Try to get blob pathname from cache or list and read it server-side
+    const blobPathname = await getCachedBlobUrl();
+    if (blobPathname) {
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 2500);
-        
-        const response = await fetch(blobUrl, { signal: controller.signal });
+
+        const result = await get(blobPathname, { access: 'private', useCache: false, abortSignal: controller.signal });
         clearTimeout(timeoutId);
-        
-        if (response.ok) {
-          const fetchedData = await response.json();
+
+        if (result && result.stream) {
+          const text = await streamToString(result.stream);
+          const fetchedData = JSON.parse(text || '{}');
           // Schema Migration Check
           if (!fetchedData.profiles || !Array.isArray(fetchedData.profiles)) {
             console.log("Old schema detected in blob. Dropping and using default multi-profile data.");
@@ -290,13 +326,13 @@ app.post("/api/portfolio", checkJwt, requireAdmin, async (req, res) => {
     }
     
     const blob = await put(DATA_BLOB_NAME, JSON.stringify(newData), {
-      access: 'public',
+      access: 'private',
       addRandomSuffix: false,
       contentType: 'application/json'
     });
     
-    // Update cache with the new blob URL
-    cachedBlobUrl = blob.url;
+    // Update cache with the new blob pathname so subsequent reads use server-side get()
+    cachedBlobPathname = blob.pathname || blob.path || null;
     cacheExpiresAt = Date.now() + 60000; // Cache for 1 minute
     
     res.json({ success: true, message: "Data updated successfully" });
@@ -305,6 +341,8 @@ app.post("/api/portfolio", checkJwt, requireAdmin, async (req, res) => {
     res.status(500).json({ error: "Failed to save portfolio data" });
   }
 });
+
+// (internal test endpoint removed)
 
 app.post("/api/upload", checkJwt, requireAdmin, async (req, res) => {
   try {
@@ -329,7 +367,7 @@ app.post("/api/upload", checkJwt, requireAdmin, async (req, res) => {
     }
 
     const blob = await put(file.name, file.data, {
-      access: 'public',
+      access: 'private',
       contentType: file.mimetype
     });
     
@@ -361,7 +399,7 @@ app.post("/api/parse-resume", checkJwt, requireAdmin, async (req, res) => {
         return res.status(500).json({ error: "Vercel Blob token not configured" });
       }
       const blob = await put(file.name, file.data, {
-        access: 'public',
+        access: 'private',
         contentType: file.mimetype
       });
       url = blob.url;
