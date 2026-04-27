@@ -3,7 +3,7 @@ const cors = require("cors");
 const path = require("path");
 const fs = require("fs");
 require("dotenv").config({ path: path.join(__dirname, ".env.local") });
-const { put, head, list } = require('@vercel/blob');
+const { put, list } = require('@vercel/blob');
 const fileUpload = require('express-fileupload');
 const pdfParse = require('pdf-parse');
 
@@ -114,6 +114,21 @@ const pruneExpiredChatSessions = () => {
 let cachedBlobUrl = null;
 let cacheExpiresAt = 0;
 
+const readBundledPortfolioData = () => {
+  try {
+    if (fs.existsSync(LOCAL_DATA_PATH)) {
+      const fetchedData = JSON.parse(fs.readFileSync(LOCAL_DATA_PATH, 'utf8'));
+      if (fetchedData.profiles && Array.isArray(fetchedData.profiles)) {
+        return fetchedData;
+      }
+    }
+  } catch (error) {
+    console.log("Failed to read bundled portfolio data:", error.message);
+  }
+
+  return defaultData;
+};
+
 const getCachedBlobUrl = async () => {
   const now = Date.now();
   if (cachedBlobUrl && now < cacheExpiresAt) {
@@ -121,14 +136,14 @@ const getCachedBlobUrl = async () => {
   }
 
   try {
-    // Set a timeout of 3 seconds for blob listing
-    const { list } = require('@vercel/blob');
-    const { blobs } = await Promise.race([
-      list({ prefix: DATA_BLOB_NAME }),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Blob list timeout')), 3000)
-      )
-    ]);
+    const abortController = new AbortController();
+    const timeoutId = setTimeout(() => abortController.abort(), 2500);
+    const { blobs } = await list({
+      prefix: DATA_BLOB_NAME,
+      limit: 1,
+      abortSignal: abortController.signal,
+    });
+    clearTimeout(timeoutId);
     
     if (blobs.length > 0) {
       cachedBlobUrl = blobs[0].url;
@@ -217,8 +232,8 @@ async function getPortfolioData() {
     }
 
     if (!process.env.BLOB_READ_WRITE_TOKEN) {
-      console.log("No BLOB token found, using default data");
-      return defaultData;
+      console.log("No BLOB token found, using bundled data");
+      return readBundledPortfolioData();
     }
 
     // Try to get blob URL from cache or list
@@ -226,7 +241,7 @@ async function getPortfolioData() {
     if (blobUrl) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000);
+        const timeoutId = setTimeout(() => controller.abort(), 2500);
         
         const response = await fetch(blobUrl, { signal: controller.signal });
         clearTimeout(timeoutId);
@@ -244,10 +259,12 @@ async function getPortfolioData() {
         console.log("Error fetching from blob:", error.message);
       }
     }
+
+    return readBundledPortfolioData();
   } catch (error) {
     console.log("Error in getPortfolioData:", error.message);
   }
-  return defaultData;
+  return readBundledPortfolioData();
 }
 
 app.get("/api/portfolio", async (req, res) => {
