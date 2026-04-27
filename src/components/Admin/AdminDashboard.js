@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from "react";
-import { useAuth0, withAuthenticationRequired } from "@auth0/auth0-react";
+import { useAuth0 } from "@auth0/auth0-react";
 import { Container, Row, Col, Form, Spinner, Alert } from "react-bootstrap";
 import { PortfolioContext } from "../../context/PortfolioContext";
 import axios from "axios";
@@ -12,7 +12,7 @@ const DEFAULT_MODEL = "nvidia/nemotron-3-super-120b-a12b:free";
 
 const AdminDashboard = () => {
   const { user, logout, getAccessTokenSilently } = useAuth0();
-  const { data, loading, refreshData } = useContext(PortfolioContext);
+  const { data, refreshData } = useContext(PortfolioContext);
   
   const API_BASE_URL = process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : '';
   const [formData, setFormData] = useState(null);
@@ -266,7 +266,7 @@ const AdminDashboard = () => {
     if (editingProfileId === id) setEditingProfileId(updated[0].id);
   };
 
-  if (loading || !formData) return <Container className="mt-5 text-center"><Spinner animation="border" variant="light"/></Container>;
+  if (!formData) return <Container className="mt-5 text-center"><Spinner animation="border" variant="light"/></Container>;
 
   const activeProfileIndex = formData.profiles.findIndex(p => p.id === editingProfileId);
   const editingProfile = formData.profiles[activeProfileIndex];
@@ -510,9 +510,54 @@ const AdminDashboard = () => {
 };
 
 const AdminDashboardProtected = () => {
+  const { isLoading, isAuthenticated, user, loginWithRedirect } = useAuth0();
+  const authConfigured = Boolean(
+    process.env.REACT_APP_AUTH0_DOMAIN &&
+    process.env.REACT_APP_AUTH0_CLIENT_ID &&
+    process.env.REACT_APP_AUTH0_CALLBACK_URL
+  );
+
+  if (!authConfigured) {
+    return <AdminDashboard />;
+  }
+
+  if (isLoading) {
+    return (
+      <Container className="mt-5 text-center">
+        <Spinner animation="border" variant="light" />
+        <p style={{ color: '#8b949e', marginTop: '16px' }}>Checking admin session...</p>
+      </Container>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <Container className="admin-dashboard-container access-denied">
+        <MdAdminPanelSettings className="access-denied-icon" />
+        <h2 style={{ color: 'white', fontWeight: 700 }}>Access Required</h2>
+        <p style={{ color: '#8b949e', maxWidth: '400px' }}>
+          You need to sign in to access the admin dashboard.
+        </p>
+        <button className="admin-btn-outline mt-4" onClick={() => loginWithRedirect({ appState: { returnTo: "/admin" } })}>
+          Sign In
+        </button>
+      </Container>
+    );
+  }
+
+  if (user?.email !== AUTHORIZED_EMAIL) {
+    return (
+      <Container className="admin-dashboard-container access-denied">
+        <MdAdminPanelSettings className="access-denied-icon" />
+        <h2 style={{ color: 'white', fontWeight: 700 }}>Access Denied</h2>
+        <p style={{ color: '#8b949e', maxWidth: '400px' }}>
+          You are logged in as {user?.email}, but you do not have administrative privileges for this portfolio.
+        </p>
+      </Container>
+    );
+  }
+
   return <AdminDashboard />;
 };
 
-export default withAuthenticationRequired(AdminDashboardProtected, {
-  onRedirecting: () => <Container className="mt-5 text-center"><Spinner animation="border" variant="light" /></Container>,
-});
+export default AdminDashboardProtected;

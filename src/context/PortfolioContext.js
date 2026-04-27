@@ -8,13 +8,48 @@ export const PortfolioProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   const API_BASE_URL = process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : '';
+  const PORTFOLIO_REQUEST_TIMEOUT_MS = 4000;
+
+  const fallbackData = {
+    activeProfileId: "fallback-profile",
+    profiles: [
+      {
+        id: "fallback-profile",
+        name: "Portfolio Admin",
+        roles: ["Full Stack Developer"],
+        avatarUrl: "",
+        resumeUrl: "",
+        experienceBio: "Fallback portfolio data loaded while the API is unavailable.",
+        projects: [],
+        systemPrompt: "You are an AI assistant for this portfolio.",
+        resumeText: "",
+      },
+    ],
+    menuVisibility: {
+      Home: true,
+      About: true,
+      Projects: true,
+      Resume: true,
+    },
+    chatbot: {
+      model: "nvidia/nemotron-3-super-120b-a12b:free",
+    },
+  };
 
   const fetchData = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/portfolio`);
-      setData(response.data);
+      const response = await axios.get(`${API_BASE_URL}/api/portfolio`, {
+        timeout: PORTFOLIO_REQUEST_TIMEOUT_MS,
+      });
+
+      if (response.data?.profiles && Array.isArray(response.data.profiles)) {
+        setData(response.data);
+      } else {
+        setData(fallbackData);
+      }
     } catch (error) {
       console.error("Failed to fetch portfolio data:", error);
+      setData(fallbackData);
     } finally {
       setLoading(false);
     }
