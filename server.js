@@ -110,6 +110,37 @@ const pruneExpiredChatSessions = () => {
   }
 };
 
+// Cache for Vercel Blob URL to avoid slow list() calls on every request
+let cachedBlobUrl = null;
+let cacheExpiresAt = 0;
+
+const getCachedBlobUrl = async () => {
+  const now = Date.now();
+  if (cachedBlobUrl && now < cacheExpiresAt) {
+    return cachedBlobUrl;
+  }
+
+  try {
+    // Set a timeout of 3 seconds for blob listing
+    const { list } = require('@vercel/blob');
+    const { blobs } = await Promise.race([
+      list({ prefix: DATA_BLOB_NAME }),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Blob list timeout')), 3000)
+      )
+    ]);
+    
+    if (blobs.length > 0) {
+      cachedBlobUrl = blobs[0].url;
+      cacheExpiresAt = now + 60000; // Cache for 1 minute
+      return cachedBlobUrl;
+    }
+  } catch (error) {
+    console.log("Failed to fetch blob URL:", error.message);
+  }
+  return null;
+};
+
 const buildProfileSystemPrompt = (portfolioData, activeProfileId) => {
   const genericPrompt = "You are an AI assistant. Answer questions helpfully and professionally. Be concise and default to 80-120 words unless asked for more detail.";
   const profiles = Array.isArray(portfolioData.profiles) ? portfolioData.profiles : [];
@@ -189,28 +220,32 @@ async function getPortfolioData() {
       console.log("No BLOB token found, using default data");
       return defaultData;
     }
-    // `head` isn't always reliable to fetch content, so we just use `fetch` with the public URL pattern.
-    // However, `@vercel/blob` has `list()` which can find the URL, but it's easier to just fetch if we know the URL.
-    // Actually, Vercel Blob gives unique URLs. Without knowing the exact URL, we should use `list()` or store the URL somewhere.
-    // But `put` with `addRandomSuffix: false` allows predictable access? Actually, Vercel Blob URLs still have a hash.
-    // Let's use `list` to find the blob by pathname.
-    const { list } = require('@vercel/blob');
-    const { blobs } = await list({ prefix: DATA_BLOB_NAME });
-    
-    if (blobs.length > 0) {
-      const response = await fetch(blobs[0].url);
-      if (response.ok) {
-        const fetchedData = await response.json();
-        // Schema Migration Check
-        if (!fetchedData.profiles || !Array.isArray(fetchedData.profiles)) {
-          console.log("Old schema detected in blob. Dropping and using default multi-profile data.");
-          return defaultData;
+
+    // Try to get blob URL from cache or list
+    const blobUrl = await getCachedBlobUrl();
+    if (blobUrl) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+        
+        const response = await fetch(blobUrl, { signal: controller.signal });
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+          const fetchedData = await response.json();
+          // Schema Migration Check
+          if (!fetchedData.profiles || !Array.isArray(fetchedData.profiles)) {
+            console.log("Old schema detected in blob. Dropping and using default multi-profile data.");
+            return defaultData;
+          }
+          return fetchedData;
         }
-        return fetchedData;
+      } catch (error) {
+        console.log("Error fetching from blob:", error.message);
       }
     }
   } catch (error) {
-    console.log("Blob not found or error fetching, using default data. Error:", error.message);
+    console.log("Error in getPortfolioData:", error.message);
   }
   return defaultData;
 }
@@ -237,11 +272,16 @@ app.post("/api/portfolio", checkJwt, requireAdmin, async (req, res) => {
       return res.status(500).json({ error: "Vercel Blob token not configured" });
     }
     
-    await put(DATA_BLOB_NAME, JSON.stringify(newData), {
+    const blob = await put(DATA_BLOB_NAME, JSON.stringify(newData), {
       access: 'public',
       addRandomSuffix: false,
       contentType: 'application/json'
     });
+    
+    // Update cache with the new blob URL
+    cachedBlobUrl = blob.url;
+    cacheExpiresAt = Date.now() + 60000; // Cache for 1 minute
+    
     res.json({ success: true, message: "Data updated successfully" });
   } catch (error) {
     console.error("Error saving data:", error);

@@ -2,6 +2,11 @@
   "buildCommand": "npm run build",
   "devCommand": "npm run start:with-server",
   "installCommand": "npm ci",
+  "functions": {
+    "api/index.js": {
+      "maxDuration": 30
+    }
+  },
   "rewrites": [
     {
       "source": "/api/(.*)",
