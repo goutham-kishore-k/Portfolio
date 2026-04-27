@@ -131,31 +131,14 @@ const readBundledPortfolioData = () => {
 };
 
 const getCachedBlobUrl = async () => {
+  // Profile management is stored in one fixed blob path only.
+  // Avoid listing the store so we never accidentally read a duplicate suffix blob.
   const now = Date.now();
-  if (cachedBlobPathname && now < cacheExpiresAt) {
-    return cachedBlobPathname;
+  if (!cachedBlobPathname || now >= cacheExpiresAt) {
+    cachedBlobPathname = DATA_BLOB_NAME;
+    cacheExpiresAt = now + 60000;
   }
-
-  try {
-    const abortController = new AbortController();
-    const timeoutId = setTimeout(() => abortController.abort(), 2500);
-    const { blobs } = await list({
-      prefix: DATA_BLOB_NAME,
-      limit: 1,
-      abortSignal: abortController.signal,
-    });
-    clearTimeout(timeoutId);
-    
-    if (blobs.length > 0) {
-      // store pathname so we can use `get()` server-side for private blobs
-      cachedBlobPathname = blobs[0].pathname || blobs[0].path || null;
-      cacheExpiresAt = now + 60000; // Cache for 1 minute
-      return cachedBlobPathname;
-    }
-  } catch (error) {
-    console.log("Failed to fetch blob URL:", error.message);
-  }
-  return null;
+  return cachedBlobPathname;
 };
 
 // Helper: convert various kinds of streams to string
@@ -325,37 +308,17 @@ app.post("/api/portfolio", checkJwt, requireAdmin, async (req, res) => {
       return res.status(500).json({ error: "Vercel Blob token not configured" });
     }
     
-    let blob;
-    try {
-      // Try to overwrite existing blob (preferred)
-      blob = await put(DATA_BLOB_NAME, JSON.stringify(newData), {
-        access: 'private',
-        allowOverwrite: true,
-        addRandomSuffix: false,
-        contentType: 'application/json',
-      });
-    } catch (err) {
-      console.log('Initial put failed:', err && err.message ? err.message : err);
-      // If blob already exists and overwrite is disallowed, create a new unique blob
-      if (err && String(err.message || '').includes('already exists')) {
-        try {
-          blob = await put(DATA_BLOB_NAME, JSON.stringify(newData), {
-            access: 'private',
-            addRandomSuffix: true,
-            contentType: 'application/json',
-          });
-        } catch (err2) {
-          console.error('Fallback put with random suffix failed:', err2);
-          throw err2;
-        }
-      } else {
-        throw err;
-      }
-    }
+    const blob = await put(DATA_BLOB_NAME, JSON.stringify(newData), {
+      access: 'private',
+      allowOverwrite: true,
+      addRandomSuffix: false,
+      contentType: 'application/json',
+    });
     
-    // Update cache with the new blob pathname so subsequent reads use server-side get()
-    cachedBlobPathname = blob.pathname || blob.path || null;
+    // Keep the cache pointed at the one fixed profile blob pathname.
+    cachedBlobPathname = DATA_BLOB_NAME;
     cacheExpiresAt = Date.now() + 60000; // Cache for 1 minute
+    console.log('Portfolio data saved to blob:', cachedBlobPathname);
     
     res.json({ success: true, message: "Data updated successfully" });
   } catch (error) {
@@ -391,7 +354,7 @@ app.post("/api/upload", checkJwt, requireAdmin, async (req, res) => {
     const blob = await put(file.name, file.data, {
       access: 'private',
       addRandomSuffix: true,
-      contentType: file.mimetype
+      contentType: file.mimetype,
     });
     
     res.json({ url: blob.url });
@@ -424,7 +387,7 @@ app.post("/api/parse-resume", checkJwt, requireAdmin, async (req, res) => {
       const blob = await put(file.name, file.data, {
         access: 'private',
         addRandomSuffix: true,
-        contentType: file.mimetype
+        contentType: file.mimetype,
       });
       url = blob.url;
     }
