@@ -237,48 +237,51 @@ const buildProfileSystemPrompt = (portfolioData, activeProfileId) => {
 
 async function getPortfolioData() {
   try {
-    if (isLocalEnv) {
-      if (fs.existsSync(LOCAL_DATA_PATH)) {
-        const fetchedData = JSON.parse(fs.readFileSync(LOCAL_DATA_PATH, 'utf8'));
-        if (!fetchedData.profiles || !Array.isArray(fetchedData.profiles)) {
-          console.log("Old schema detected in local file. Using default multi-profile data.");
-          return defaultData;
-        }
-        return fetchedData;
-      }
-      return defaultData;
-    }
+    const hasBlobToken = Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+    console.log('[portfolio] load start', { hasBlobToken, isLocalEnv, blobName: DATA_BLOB_NAME });
 
-    if (!process.env.BLOB_READ_WRITE_TOKEN) {
-      console.log("No BLOB token found, using bundled data");
-      return readBundledPortfolioData();
-    }
+    if (hasBlobToken) {
+      // Prefer the blob store in every environment so local dev matches Vercel.
+      const blobPathname = await getCachedBlobUrl();
+      if (blobPathname) {
+        try {
+          console.log('[portfolio] attempting blob read', blobPathname);
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 2500);
 
-    // Try to get blob pathname from cache or list and read it server-side
-    const blobPathname = await getCachedBlobUrl();
-    if (blobPathname) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2500);
+          const result = await get(blobPathname, { access: 'private', useCache: false, abortSignal: controller.signal });
+          clearTimeout(timeoutId);
 
-        const result = await get(blobPathname, { access: 'private', useCache: false, abortSignal: controller.signal });
-        clearTimeout(timeoutId);
-
-        if (result && result.stream) {
-          const text = await streamToString(result.stream);
-          const fetchedData = JSON.parse(text || '{}');
-          // Schema Migration Check
-          if (!fetchedData.profiles || !Array.isArray(fetchedData.profiles)) {
-            console.log("Old schema detected in blob. Dropping and using default multi-profile data.");
-            return defaultData;
+          if (result && result.stream) {
+            const text = await streamToString(result.stream);
+            const fetchedData = JSON.parse(text || '{}');
+            // Schema Migration Check
+            if (!fetchedData.profiles || !Array.isArray(fetchedData.profiles)) {
+              console.log("Old schema detected in blob. Dropping and using default multi-profile data.");
+              return defaultData;
+            }
+            console.log('[portfolio] loaded from blob', { activeProfileId: fetchedData.activeProfileId, profileCount: fetchedData.profiles.length });
+            return fetchedData;
           }
-          return fetchedData;
+          console.log('[portfolio] blob read returned no stream');
+        } catch (error) {
+          console.log("Error fetching from blob:", error.message);
         }
-      } catch (error) {
-        console.log("Error fetching from blob:", error.message);
       }
     }
 
+    if (fs.existsSync(LOCAL_DATA_PATH)) {
+      console.log('[portfolio] loading local file', LOCAL_DATA_PATH);
+      const fetchedData = JSON.parse(fs.readFileSync(LOCAL_DATA_PATH, 'utf8'));
+      if (!fetchedData.profiles || !Array.isArray(fetchedData.profiles)) {
+        console.log("Old schema detected in local file. Using default multi-profile data.");
+        return defaultData;
+      }
+      console.log('[portfolio] loaded local file', { activeProfileId: fetchedData.activeProfileId, profileCount: fetchedData.profiles.length });
+      return fetchedData;
+    }
+
+    console.log('[portfolio] loading bundled data');
     return readBundledPortfolioData();
   } catch (error) {
     console.log("Error in getPortfolioData:", error.message);
@@ -289,22 +292,55 @@ async function getPortfolioData() {
 app.get("/api/portfolio", async (req, res) => {
   try {
     const data = await getPortfolioData();
+    res.set({
+      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+      Pragma: 'no-cache',
+      Expires: '0',
+      Surrogate-Control: 'no-store',
+    });
     res.json(data);
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch portfolio data" });
   }
 });
 
+// Dev-only helper: allow saving portfolio without Auth0 when running locally.
+app.post("/api/portfolio/debug-save", async (req, res) => {
+  try {
+    if (!isLocalEnv) return res.status(403).json({ error: 'Forbidden' });
+    const newData = req.body;
+
+    if (process.env.BLOB_READ_WRITE_TOKEN) {
+      const blob = await put(DATA_BLOB_NAME, JSON.stringify(newData), {
+        access: 'private',
+        allowOverwrite: true,
+        addRandomSuffix: false,
+        contentType: 'application/json',
+      });
+      cachedBlobPathname = DATA_BLOB_NAME;
+      cacheExpiresAt = Date.now() + 60000;
+      console.log('Dev: portfolio data saved to blob:', cachedBlobPathname);
+      return res.json({ success: true, message: 'Saved to blob', data: newData, blob });
+    }
+
+    fs.writeFileSync(LOCAL_DATA_PATH, JSON.stringify(newData, null, 2));
+    console.log('Dev: portfolio data saved locally:', LOCAL_DATA_PATH);
+    res.json({ success: true, message: 'Saved locally', data: newData });
+  } catch (error) {
+    console.error('Dev save error:', error);
+    res.status(500).json({ error: 'Failed to save (dev)' });
+  }
+});
+
 app.post("/api/portfolio", checkJwt, requireAdmin, async (req, res) => {
   try {
     const newData = req.body;
-    
-    if (isLocalEnv) {
-      fs.writeFileSync(LOCAL_DATA_PATH, JSON.stringify(newData, null, 2));
-      return res.json({ success: true, message: "Data updated locally" });
-    }
 
     if (!process.env.BLOB_READ_WRITE_TOKEN) {
+      if (isLocalEnv) {
+        fs.writeFileSync(LOCAL_DATA_PATH, JSON.stringify(newData, null, 2));
+        return res.json({ success: true, message: "Data updated locally", data: newData });
+      }
       return res.status(500).json({ error: "Vercel Blob token not configured" });
     }
     
@@ -320,7 +356,7 @@ app.post("/api/portfolio", checkJwt, requireAdmin, async (req, res) => {
     cacheExpiresAt = Date.now() + 60000; // Cache for 1 minute
     console.log('Portfolio data saved to blob:', cachedBlobPathname);
     
-    res.json({ success: true, message: "Data updated successfully" });
+    res.json({ success: true, message: "Data updated successfully", data: newData, blob });
   } catch (error) {
     console.error("Error saving data:", error);
     res.status(500).json({ error: "Failed to save portfolio data" });

@@ -40,6 +40,11 @@ export const PortfolioProvider = ({ children }) => {
     try {
       const response = await axios.get(`${API_BASE_URL}/api/portfolio`, {
         timeout: PORTFOLIO_REQUEST_TIMEOUT_MS,
+        params: { _t: Date.now() },
+        headers: {
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache',
+        },
       });
 
       if (response.data?.profiles && Array.isArray(response.data.profiles)) {
@@ -59,6 +64,11 @@ export const PortfolioProvider = ({ children }) => {
     fetchData();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const updateData = (newData) => {
+    setData(newData);
+    setLoading(false);
+  };
+
   const refreshData = () => {
     setLoading(true);
     fetchData();
@@ -67,7 +77,7 @@ export const PortfolioProvider = ({ children }) => {
   const activeProfile = data?.profiles?.find(p => p.id === data.activeProfileId) || data?.profiles?.[0] || null;
 
   return (
-    <PortfolioContext.Provider value={{ data, loading, refreshData, activeProfile }}>
+    <PortfolioContext.Provider value={{ data, loading, refreshData, updateData, activeProfile }}>
       {children}
     </PortfolioContext.Provider>
   );

@@ -12,7 +12,7 @@ const DEFAULT_MODEL = "nvidia/nemotron-3-super-120b-a12b:free";
 
 const AdminDashboard = () => {
   const { user, logout, getAccessTokenSilently } = useAuth0();
-  const { data, refreshData } = useContext(PortfolioContext);
+  const { data, refreshData, updateData } = useContext(PortfolioContext);
   
   const API_BASE_URL = process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : '';
   const [formData, setFormData] = useState(null);
@@ -128,11 +128,16 @@ const AdminDashboard = () => {
     setMessage(null);
     try {
       const token = await getAccessTokenSilently();
-      await axios.post(`${API_BASE_URL}/api/portfolio`, formData, {
+      const res = await axios.post(`${API_BASE_URL}/api/portfolio`, formData, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setMessage({ type: 'success', text: 'Data saved successfully!' });
-      refreshData();
+      const returned = res.data?.data;
+      if (returned && typeof updateData === 'function') {
+        updateData(returned);
+      } else {
+        refreshData();
+      }
     } catch (error) {
       console.error(error);
       setMessage({ type: 'danger', text: 'Failed to save data. Check console.' });
