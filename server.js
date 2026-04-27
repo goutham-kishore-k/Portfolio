@@ -325,11 +325,33 @@ app.post("/api/portfolio", checkJwt, requireAdmin, async (req, res) => {
       return res.status(500).json({ error: "Vercel Blob token not configured" });
     }
     
-    const blob = await put(DATA_BLOB_NAME, JSON.stringify(newData), {
-      access: 'private',
-      addRandomSuffix: false,
-      contentType: 'application/json'
-    });
+    let blob;
+    try {
+      // Try to overwrite existing blob (preferred)
+      blob = await put(DATA_BLOB_NAME, JSON.stringify(newData), {
+        access: 'private',
+        allowOverwrite: true,
+        addRandomSuffix: false,
+        contentType: 'application/json',
+      });
+    } catch (err) {
+      console.log('Initial put failed:', err && err.message ? err.message : err);
+      // If blob already exists and overwrite is disallowed, create a new unique blob
+      if (err && String(err.message || '').includes('already exists')) {
+        try {
+          blob = await put(DATA_BLOB_NAME, JSON.stringify(newData), {
+            access: 'private',
+            addRandomSuffix: true,
+            contentType: 'application/json',
+          });
+        } catch (err2) {
+          console.error('Fallback put with random suffix failed:', err2);
+          throw err2;
+        }
+      } else {
+        throw err;
+      }
+    }
     
     // Update cache with the new blob pathname so subsequent reads use server-side get()
     cachedBlobPathname = blob.pathname || blob.path || null;
@@ -368,6 +390,7 @@ app.post("/api/upload", checkJwt, requireAdmin, async (req, res) => {
 
     const blob = await put(file.name, file.data, {
       access: 'private',
+      addRandomSuffix: true,
       contentType: file.mimetype
     });
     
@@ -400,6 +423,7 @@ app.post("/api/parse-resume", checkJwt, requireAdmin, async (req, res) => {
       }
       const blob = await put(file.name, file.data, {
         access: 'private',
+        addRandomSuffix: true,
         contentType: file.mimetype
       });
       url = blob.url;
