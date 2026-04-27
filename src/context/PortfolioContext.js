@@ -22,7 +22,7 @@ export const PortfolioProvider = ({ children }) => {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const refreshData = () => {
     setLoading(true);

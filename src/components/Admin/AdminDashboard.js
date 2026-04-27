@@ -41,7 +41,7 @@ const AdminDashboard = () => {
         setEditingProfileId(copy.profiles[0].id);
       }
     }
-  }, [data]);
+  }, [data, editingProfileId]);
 
   const refreshModels = async () => {
     if (modelsLoading) return;
@@ -106,7 +106,7 @@ const AdminDashboard = () => {
     if (activeTab === "global" && availableModels.length === 0 && formData?.chatbot) {
       refreshModels();
     }
-  }, [activeTab]);
+  }, [activeTab, availableModels, formData]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (user?.email !== AUTHORIZED_EMAIL) {
     return (

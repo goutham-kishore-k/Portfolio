@@ -63,7 +63,7 @@ const AIChat = () => {
         ],
       },
     ]);
-  }, [activeProfile?.id]);
+  }, [activeProfile]);
 
   const quickActions = useMemo(
     () => [
