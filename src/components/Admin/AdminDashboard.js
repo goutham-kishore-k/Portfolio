@@ -23,6 +23,7 @@ const AdminDashboard = () => {
   const [availableModels, setAvailableModels] = useState([]);
   const [modelsLoading, setModelsLoading] = useState(false);
   const [parsingResume, setParsingResume] = useState(false);
+  const [pullingFromMongo, setPullingFromMongo] = useState(false);
 
   useEffect(() => {
     if (data) {
@@ -143,6 +144,38 @@ const AdminDashboard = () => {
       setMessage({ type: 'danger', text: 'Failed to save data. Check console.' });
     } finally {
       setSaving(false);
+      setTimeout(() => setMessage(null), 5000);
+    }
+  };
+
+  const handlePullFromMongo = async () => {
+    if (pullingFromMongo) return;
+
+    setPullingFromMongo(true);
+    setMessage(null);
+    try {
+      const token = await getAccessTokenSilently();
+      const res = await axios.post(`${API_BASE_URL}/api/portfolio/refresh`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      const returned = res.data?.data;
+      if (returned && typeof updateData === 'function') {
+        updateData(returned);
+      }
+
+      setFormData((prev) => {
+        if (!prev) return prev;
+        return returned ? JSON.parse(JSON.stringify(returned)) : prev;
+      });
+
+      setMessage({ type: 'success', text: 'Pulled latest portfolio data from MongoDB.' });
+    } catch (error) {
+      console.error('Mongo pull error', error);
+      const errorText = error?.response?.data?.error || error?.message || 'Failed to pull portfolio data from MongoDB.';
+      setMessage({ type: 'danger', text: errorText });
+    } finally {
+      setPullingFromMongo(false);
       setTimeout(() => setMessage(null), 5000);
     }
   };
@@ -457,6 +490,11 @@ const AdminDashboard = () => {
             {activeTab === 'global' && (
               <div>
                 <h3 style={{color: 'white', marginBottom: '20px'}}>Global Settings</h3>
+                <div className="d-flex justify-content-end mb-3">
+                  <button className="admin-btn-outline" onClick={handlePullFromMongo} disabled={pullingFromMongo}>
+                    {pullingFromMongo ? 'Pulling from Mongo...' : 'Pull portfolio_data from Mongo'}
+                  </button>
+                </div>
                 
                 <h5 style={{color: '#c770f0', marginTop: '20px'}}>Menu Visibility</h5>
                 <Row className="mb-4">

@@ -42,13 +42,14 @@
     "oauth4webapi": "3.8.4"
   },
   "scripts": {
-    "postinstall": "node scripts/fix-oauth4webapi-sourcemap.js",
-    "server": "node server.js",
     "start": "set PORT=3001&& set DANGEROUSLY_DISABLE_HOST_CHECK=true&& react-scripts start",
     "start:with-server": "concurrently \"npm run server\" \"npm start\"",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "sync-from-mongo": "node scripts/sync-from-mongo.js",
+    "sync-to-mongo": "node scripts/sync-to-mongo.js",
+    "build:sync": "npm run sync-from-mongo && npm run build"
   },
   "eslintConfig": {
     "extends": [

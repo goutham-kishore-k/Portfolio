@@ -509,6 +509,26 @@ app.post("/api/portfolio/debug-save", async (req, res) => {
   }
 });
 
+app.post("/api/portfolio/refresh", checkJwt, requireAdmin, async (req, res) => {
+  try {
+    const loaded = await loadPortfolioFromMongo();
+    if (!loaded) {
+      return res.status(404).json({ error: "No portfolio data found in MongoDB" });
+    }
+
+    res.json({
+      success: true,
+      message: "Portfolio data pulled from MongoDB",
+      data: loaded,
+      updatedAt: portfolioCacheUpdatedAt,
+      source: portfolioCacheSource,
+    });
+  } catch (error) {
+    console.error("Error refreshing portfolio from Mongo:", error);
+    res.status(500).json({ error: "Failed to refresh portfolio from MongoDB" });
+  }
+});
+
 app.post("/api/portfolio", checkJwt, requireAdmin, async (req, res) => {
   try {
     const newData = req.body;
