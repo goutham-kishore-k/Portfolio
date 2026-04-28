@@ -36,16 +36,21 @@ export const PortfolioProvider = ({ children }) => {
     },
   };
 
-  const fetchData = async () => {
+  const fetchData = async (forceRefresh = false) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/portfolio`, {
+      const requestConfig = {
         timeout: PORTFOLIO_REQUEST_TIMEOUT_MS,
-        params: { _t: Date.now() },
         headers: {
-          'Cache-Control': 'no-cache',
-          Pragma: 'no-cache',
+          'Cache-Control': forceRefresh ? 'no-cache' : 'max-age=0',
+          Pragma: forceRefresh ? 'no-cache' : 'max-age=0',
         },
-      });
+      };
+
+      if (forceRefresh) {
+        requestConfig.params = { _t: Date.now() };
+      }
+
+      const response = await axios.get(`${API_BASE_URL}/api/portfolio`, requestConfig);
 
       if (response.data?.profiles && Array.isArray(response.data.profiles)) {
         setData(response.data);
@@ -69,9 +74,9 @@ export const PortfolioProvider = ({ children }) => {
     setLoading(false);
   };
 
-  const refreshData = () => {
+  const refreshData = (forceRefresh = false) => {
     setLoading(true);
-    fetchData();
+    fetchData(forceRefresh);
   };
 
   const activeProfile = data?.profiles?.find(p => p.id === data.activeProfileId) || data?.profiles?.[0] || null;

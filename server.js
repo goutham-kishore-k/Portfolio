@@ -34,6 +34,7 @@ if (process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV) {
 const isLocalEnv = !process.env.VERCEL_ENV && process.env.NODE_ENV !== 'production';
 const LOCAL_DATA_PATH = path.join(__dirname, 'portfolio_data.json');
 const MONGODB_URI = process.env.MONGODB_URI || '';
+const MONGODB_TIMEOUT_MS = Number(process.env.MONGODB_TIMEOUT_MS || 4000);
 const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || (() => {
   try {
     if (!MONGODB_URI) return 'portfolio';
@@ -137,6 +138,9 @@ const getPortfolioCollection = async () => {
   if (!mongoClientPromise) {
     mongoClientPromise = MongoClient.connect(MONGODB_URI, {
       maxPoolSize: 5,
+      serverSelectionTimeoutMS: MONGODB_TIMEOUT_MS,
+      connectTimeoutMS: MONGODB_TIMEOUT_MS,
+      socketTimeoutMS: MONGODB_TIMEOUT_MS,
     })
       .then((client) => {
         mongoClient = client;
@@ -161,6 +165,9 @@ const getMongoDb = async () => {
   if (!mongoClientPromise) {
     mongoClientPromise = MongoClient.connect(MONGODB_URI, {
       maxPoolSize: 5,
+      serverSelectionTimeoutMS: MONGODB_TIMEOUT_MS,
+      connectTimeoutMS: MONGODB_TIMEOUT_MS,
+      socketTimeoutMS: MONGODB_TIMEOUT_MS,
     })
       .then((client) => {
         mongoClient = client;
@@ -337,6 +344,7 @@ const buildProfileSystemPrompt = (portfolioData, activeProfileId) => {
 
 async function getPortfolioData() {
   try {
+    getPortfolioData.lastUpdatedAt = null;
     const collection = await getPortfolioCollection();
     console.log('[portfolio] load start', { hasMongo: Boolean(collection), isLocalEnv, dbName: MONGODB_DB_NAME, collection: PORTFOLIO_COLLECTION });
 
@@ -344,6 +352,7 @@ async function getPortfolioData() {
       try {
         const doc = await collection.findOne({ _id: PORTFOLIO_DOCUMENT_ID });
         if (doc?.data && Array.isArray(doc.data.profiles)) {
+          getPortfolioData.lastUpdatedAt = doc.updatedAt || doc.data?.updatedAt || new Date();
           console.log('[portfolio] loaded from mongo', { activeProfileId: doc.data.activeProfileId, profileCount: doc.data.profiles.length });
           return doc.data;
         }
@@ -360,6 +369,12 @@ async function getPortfolioData() {
     if (fs.existsSync(LOCAL_DATA_PATH)) {
       console.log('[portfolio] loading local file', LOCAL_DATA_PATH);
       const fetchedData = JSON.parse(fs.readFileSync(LOCAL_DATA_PATH, 'utf8'));
+      try {
+        const localStats = fs.statSync(LOCAL_DATA_PATH);
+        getPortfolioData.lastUpdatedAt = localStats.mtime;
+      } catch (statError) {
+        getPortfolioData.lastUpdatedAt = new Date();
+      }
       if (!fetchedData.profiles || !Array.isArray(fetchedData.profiles)) {
         console.log("Old schema detected in local file. Using default multi-profile data.");
         return defaultData;
@@ -381,6 +396,7 @@ async function getPortfolioData() {
     }
 
     console.log('[portfolio] loading bundled data');
+    getPortfolioData.lastUpdatedAt = new Date(0);
     const bundledData = readBundledPortfolioData();
     if (collection) {
       try {
@@ -404,12 +420,25 @@ async function getPortfolioData() {
 app.get("/api/portfolio", async (req, res) => {
   try {
     const data = await getPortfolioData();
+    const updatedAt = getPortfolioData.lastUpdatedAt instanceof Date ? getPortfolioData.lastUpdatedAt : new Date(0);
+    const etag = `"portfolio-${updatedAt.getTime()}-${JSON.stringify(data).length}"`;
     res.set({
-      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-      Pragma: 'no-cache',
-      Expires: '0',
-      'Surrogate-Control': 'no-store',
+      'Cache-Control': 'public, max-age=0, s-maxage=300, stale-while-revalidate=86400',
+      'CDN-Cache-Control': 'public, s-maxage=300, stale-while-revalidate=86400',
+      'Vercel-CDN-Cache-Control': 'public, s-maxage=300, stale-while-revalidate=86400',
+      ETag: etag,
+      'Last-Modified': updatedAt.toUTCString(),
     });
+    if (req.headers['if-none-match'] === etag) {
+      return res.status(304).end();
+    }
+    const ifModifiedSince = req.headers['if-modified-since'];
+    if (ifModifiedSince) {
+      const sinceTime = Date.parse(ifModifiedSince);
+      if (!Number.isNaN(sinceTime) && updatedAt.getTime() <= sinceTime) {
+        return res.status(304).end();
+      }
+    }
     res.json(data);
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch portfolio data" });
