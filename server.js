@@ -127,6 +127,81 @@ const pruneExpiredChatSessions = () => {
 
 let mongoClient = null;
 let mongoClientPromise = null;
+let portfolioCache = defaultData;
+let portfolioCacheSource = 'default';
+let portfolioCacheUpdatedAt = new Date(0);
+let portfolioBootstrapPromise = null;
+
+const setPortfolioCache = (data, source, updatedAt = new Date()) => {
+  if (data && Array.isArray(data.profiles)) {
+    portfolioCache = data;
+    portfolioCacheSource = source;
+    portfolioCacheUpdatedAt = updatedAt instanceof Date ? updatedAt : new Date(updatedAt);
+    console.log('[portfolio] cache updated', {
+      source: portfolioCacheSource,
+      activeProfileId: portfolioCache.activeProfileId,
+      profileCount: portfolioCache.profiles.length,
+    });
+  }
+};
+
+const loadPortfolioFromMongo = async () => {
+  const collection = await getPortfolioCollection();
+  if (!collection) return null;
+
+  const doc = await collection.findOne({ _id: PORTFOLIO_DOCUMENT_ID });
+  if (doc?.data && Array.isArray(doc.data.profiles)) {
+    setPortfolioCache(doc.data, 'mongo', doc.updatedAt || new Date());
+    return doc.data;
+  }
+  return null;
+};
+
+const bootstrapPortfolioCache = async () => {
+  if (portfolioBootstrapPromise) return portfolioBootstrapPromise;
+
+  portfolioBootstrapPromise = (async () => {
+    console.log('[portfolio] bootstrap start', { hasMongoUri: Boolean(MONGODB_URI), dbName: MONGODB_DB_NAME });
+
+    if (!MONGODB_URI) {
+      console.log('[portfolio] bootstrap using default profile because MONGODB_URI is missing');
+      setPortfolioCache(defaultData, 'default');
+      return portfolioCache;
+    }
+
+    try {
+      const collection = await getPortfolioCollection();
+      console.log('[portfolio] mongo connection ready', { dbName: MONGODB_DB_NAME, collection: PORTFOLIO_COLLECTION });
+
+      const loaded = await loadPortfolioFromMongo();
+      if (loaded) {
+        console.log('[portfolio] bootstrap loaded portfolio from mongo');
+        return loaded;
+      }
+
+      console.log('[portfolio] no mongo portfolio found, seeding default profile');
+      await collection.updateOne(
+        { _id: PORTFOLIO_DOCUMENT_ID },
+        { $set: { data: defaultData, updatedAt: new Date() } },
+        { upsert: true }
+      );
+      setPortfolioCache(defaultData, 'default-seeded-mongo');
+      return defaultData;
+    } catch (error) {
+      console.error('[portfolio] bootstrap mongo failed:', error.message);
+      setPortfolioCache(defaultData, 'default-fallback');
+      return defaultData;
+    }
+  })();
+
+  return portfolioBootstrapPromise;
+};
+
+setImmediate(() => {
+  bootstrapPortfolioCache().catch((error) => {
+    console.error('[portfolio] bootstrap unexpected error:', error.message);
+  });
+});
 
 const getPortfolioCollection = async () => {
   if (!MONGODB_URI) return null;
@@ -344,73 +419,21 @@ const buildProfileSystemPrompt = (portfolioData, activeProfileId) => {
 
 async function getPortfolioData() {
   try {
-    getPortfolioData.lastUpdatedAt = null;
-    const collection = await getPortfolioCollection();
-    console.log('[portfolio] load start', { hasMongo: Boolean(collection), isLocalEnv, dbName: MONGODB_DB_NAME, collection: PORTFOLIO_COLLECTION });
-
-    if (collection) {
-      try {
-        const doc = await collection.findOne({ _id: PORTFOLIO_DOCUMENT_ID });
-        if (doc?.data && Array.isArray(doc.data.profiles)) {
-          getPortfolioData.lastUpdatedAt = doc.updatedAt || doc.data?.updatedAt || new Date();
-          console.log('[portfolio] loaded from mongo', { activeProfileId: doc.data.activeProfileId, profileCount: doc.data.profiles.length });
-          return doc.data;
-        }
-        if (doc?.data) {
-          console.log('[portfolio] mongo document found but invalid schema');
-        } else {
-          console.log('[portfolio] no mongo document found');
-        }
-      } catch (error) {
-        console.log('Error fetching from mongo:', error.message);
-      }
+    if (!portfolioBootstrapPromise) {
+      bootstrapPortfolioCache().catch((error) => {
+        console.error('[portfolio] bootstrap trigger failed:', error.message);
+      });
     }
 
-    if (fs.existsSync(LOCAL_DATA_PATH)) {
-      console.log('[portfolio] loading local file', LOCAL_DATA_PATH);
-      const fetchedData = JSON.parse(fs.readFileSync(LOCAL_DATA_PATH, 'utf8'));
-      try {
-        const localStats = fs.statSync(LOCAL_DATA_PATH);
-        getPortfolioData.lastUpdatedAt = localStats.mtime;
-      } catch (statError) {
-        getPortfolioData.lastUpdatedAt = new Date();
-      }
-      if (!fetchedData.profiles || !Array.isArray(fetchedData.profiles)) {
-        console.log("Old schema detected in local file. Using default multi-profile data.");
-        return defaultData;
-      }
-      console.log('[portfolio] loaded local file', { activeProfileId: fetchedData.activeProfileId, profileCount: fetchedData.profiles.length });
-      if (collection) {
-        try {
-          await collection.updateOne(
-            { _id: PORTFOLIO_DOCUMENT_ID },
-            { $set: { data: fetchedData, updatedAt: new Date() } },
-            { upsert: true }
-          );
-          console.log('[portfolio] seeded mongo from local file');
-        } catch (error) {
-          console.log('Error seeding mongo from local file:', error.message);
-        }
-      }
-      return fetchedData;
-    }
+    console.log('[portfolio] returning cache', {
+      source: portfolioCacheSource,
+      activeProfileId: portfolioCache?.activeProfileId,
+      profileCount: portfolioCache?.profiles?.length,
+      updatedAt: portfolioCacheUpdatedAt instanceof Date ? portfolioCacheUpdatedAt.toISOString() : null,
+    });
 
-    console.log('[portfolio] loading bundled data');
-    getPortfolioData.lastUpdatedAt = new Date(0);
-    const bundledData = readBundledPortfolioData();
-    if (collection) {
-      try {
-        await collection.updateOne(
-          { _id: PORTFOLIO_DOCUMENT_ID },
-          { $set: { data: bundledData, updatedAt: new Date() } },
-          { upsert: true }
-        );
-        console.log('[portfolio] seeded mongo from bundled data');
-      } catch (error) {
-        console.log('Error seeding mongo from bundled data:', error.message);
-      }
-    }
-    return bundledData;
+    getPortfolioData.lastUpdatedAt = portfolioCacheUpdatedAt;
+    return portfolioCache || defaultData;
   } catch (error) {
     console.log("Error in getPortfolioData:", error.message);
   }
@@ -472,6 +495,7 @@ app.post("/api/portfolio/debug-save", async (req, res) => {
         { $set: { data: newData, updatedAt: new Date() } },
         { upsert: true }
       );
+      setPortfolioCache(newData, 'mongo-write');
       console.log('Dev: portfolio data saved to mongo:', MONGODB_DB_NAME, PORTFOLIO_COLLECTION);
       return res.json({ success: true, message: 'Saved to mongo', data: newData });
     }
@@ -496,12 +520,14 @@ app.post("/api/portfolio", checkJwt, requireAdmin, async (req, res) => {
         { $set: { data: newData, updatedAt: new Date() } },
         { upsert: true }
       );
+      setPortfolioCache(newData, 'mongo-write');
       console.log('Portfolio data saved to mongo:', MONGODB_DB_NAME, PORTFOLIO_COLLECTION);
       return res.json({ success: true, message: "Data updated successfully", data: newData });
     }
 
     if (isLocalEnv) {
       fs.writeFileSync(LOCAL_DATA_PATH, JSON.stringify(newData, null, 2));
+      setPortfolioCache(newData, 'local-write');
       return res.json({ success: true, message: "Data updated locally", data: newData });
     }
     return res.status(500).json({ error: "MongoDB not configured" });
