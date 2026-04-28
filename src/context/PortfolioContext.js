@@ -36,6 +36,12 @@ export const PortfolioProvider = ({ children }) => {
     },
   };
 
+  const isValidPortfolioData = (value) => Boolean(
+    value &&
+    Array.isArray(value.profiles) &&
+    value.profiles.length > 0
+  );
+
   const fetchData = async (forceRefresh = false) => {
     try {
       const requestConfig = {
@@ -52,14 +58,16 @@ export const PortfolioProvider = ({ children }) => {
 
       const response = await axios.get(`${API_BASE_URL}/api/portfolio`, requestConfig);
 
-      if (response.data?.profiles && Array.isArray(response.data.profiles)) {
+      if (isValidPortfolioData(response.data)) {
         setData(response.data);
-      } else {
+      } else if (!data) {
         setData(fallbackData);
       }
     } catch (error) {
       console.error("Failed to fetch portfolio data:", error);
-      setData(fallbackData);
+      if (!data) {
+        setData(fallbackData);
+      }
     } finally {
       setLoading(false);
     }
