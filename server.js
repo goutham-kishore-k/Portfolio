@@ -3,8 +3,8 @@ const cors = require("cors");
 const path = require("path");
 const fs = require("fs");
 require("dotenv").config({ path: path.join(__dirname, ".env.local") });
-const { put, list, get } = require('@vercel/blob');
-const { Readable } = require('stream');
+const { put } = require('@vercel/blob');
+const { MongoClient, GridFSBucket, ObjectId } = require('mongodb');
 const fileUpload = require('express-fileupload');
 const pdfParse = require('pdf-parse');
 
@@ -33,6 +33,21 @@ if (process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV) {
 
 const isLocalEnv = !process.env.VERCEL_ENV && process.env.NODE_ENV !== 'production';
 const LOCAL_DATA_PATH = path.join(__dirname, 'portfolio_data.json');
+const MONGODB_URI = process.env.MONGODB_URI || '';
+const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || (() => {
+  try {
+    if (!MONGODB_URI) return 'portfolio';
+    const pathname = new URL(MONGODB_URI).pathname.replace(/^\/+/, '');
+    // Many Atlas URIs use /admin for auth; keep app data in a dedicated DB.
+    if (!pathname || pathname.toLowerCase() === 'admin') return 'portfolio';
+    return pathname;
+  } catch (error) {
+    return 'portfolio';
+  }
+})();
+const PORTFOLIO_COLLECTION = 'portfolio_data';
+const PORTFOLIO_DOCUMENT_ID = 'portfolio_data';
+const RESUME_BUCKET_NAME = process.env.MONGODB_RESUME_BUCKET || 'resumes';
 
 // Auth0 Middleware (Validates Opaque Tokens by calling /userinfo)
 const checkJwt = async (req, res, next) => {
@@ -64,8 +79,6 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
-// Helper to interact with Vercel Blob for data.json
-const DATA_BLOB_NAME = 'portfolio_data.json';
 const defaultData = {
   activeProfileId: "default-1",
   profiles: [
@@ -111,9 +124,140 @@ const pruneExpiredChatSessions = () => {
   }
 };
 
-// Cache for Vercel Blob URL to avoid slow list() calls on every request
-let cachedBlobPathname = null;
-let cacheExpiresAt = 0;
+let mongoClient = null;
+let mongoClientPromise = null;
+
+const getPortfolioCollection = async () => {
+  if (!MONGODB_URI) return null;
+
+  if (mongoClient) {
+    return mongoClient.db(MONGODB_DB_NAME).collection(PORTFOLIO_COLLECTION);
+  }
+
+  if (!mongoClientPromise) {
+    mongoClientPromise = MongoClient.connect(MONGODB_URI, {
+      maxPoolSize: 5,
+    })
+      .then((client) => {
+        mongoClient = client;
+        return client;
+      })
+      .catch((error) => {
+        mongoClientPromise = null;
+        throw error;
+      });
+  }
+
+  const client = await mongoClientPromise;
+  return client.db(MONGODB_DB_NAME).collection(PORTFOLIO_COLLECTION);
+};
+
+const getMongoDb = async () => {
+  if (!MONGODB_URI) return null;
+  if (mongoClient) {
+    return mongoClient.db(MONGODB_DB_NAME);
+  }
+
+  if (!mongoClientPromise) {
+    mongoClientPromise = MongoClient.connect(MONGODB_URI, {
+      maxPoolSize: 5,
+    })
+      .then((client) => {
+        mongoClient = client;
+        return client;
+      })
+      .catch((error) => {
+        mongoClientPromise = null;
+        throw error;
+      });
+  }
+
+  const client = await mongoClientPromise;
+  return client.db(MONGODB_DB_NAME);
+};
+
+const getResumeBucket = async () => {
+  const db = await getMongoDb();
+  if (!db) return null;
+  return new GridFSBucket(db, { bucketName: RESUME_BUCKET_NAME });
+};
+
+const uploadResumePdfToMongo = async (file) => {
+  const bucket = await getResumeBucket();
+  if (!bucket) return null;
+
+  const uploadStream = bucket.openUploadStream(file.name || `resume-${Date.now()}.pdf`, {
+    contentType: file.mimetype || 'application/pdf',
+    metadata: {
+      originalName: file.name,
+      uploadedAt: new Date(),
+    },
+  });
+
+  await new Promise((resolve, reject) => {
+    uploadStream.on('error', reject);
+    uploadStream.on('finish', resolve);
+    uploadStream.end(file.data);
+  });
+
+  const fileId = uploadStream.id.toString();
+  return {
+    fileId,
+    url: `/api/resume/${fileId}`,
+  };
+};
+
+const streamGridFsFile = async (fileId, req, res) => {
+  const bucket = await getResumeBucket();
+  if (!bucket) return false;
+
+  let objectId;
+  try {
+    objectId = new ObjectId(fileId);
+  } catch (error) {
+    return false;
+  }
+
+  const files = await bucket.find({ _id: objectId }).toArray();
+  if (!files.length) return false;
+
+  const file = files[0];
+  const uploadTime = new Date(file.uploadDate || Date.now());
+  const etag = `"resume-${file._id.toString()}-${file.length || 0}-${uploadTime.getTime()}"`;
+
+  res.set({
+    'Content-Type': file.contentType || 'application/pdf',
+    'Content-Disposition': `inline; filename="${file.filename || 'resume.pdf'}"`,
+    ETag: etag,
+    'Last-Modified': uploadTime.toUTCString(),
+    'Cache-Control': 'public, max-age=31536000, immutable',
+    'CDN-Cache-Control': 'public, s-maxage=31536000, stale-while-revalidate=86400',
+    'Vercel-CDN-Cache-Control': 'public, s-maxage=31536000, stale-while-revalidate=86400',
+  });
+
+  if (req.headers['if-none-match'] === etag) {
+    res.status(304).end();
+    return true;
+  }
+
+  const ifModifiedSince = req.headers['if-modified-since'];
+  if (ifModifiedSince) {
+    const sinceTime = Date.parse(ifModifiedSince);
+    if (!Number.isNaN(sinceTime) && uploadTime.getTime() <= sinceTime) {
+      res.status(304).end();
+      return true;
+    }
+  }
+
+  await new Promise((resolve, reject) => {
+    const downloadStream = bucket.openDownloadStream(objectId);
+    downloadStream.on('error', reject);
+    downloadStream.on('end', resolve);
+    downloadStream.pipe(res);
+  });
+
+  return true;
+};
 
 const readBundledPortfolioData = () => {
   try {
@@ -128,50 +272,6 @@ const readBundledPortfolioData = () => {
   }
 
   return defaultData;
-};
-
-const getCachedBlobUrl = async () => {
-  // Profile management is stored in one fixed blob path only.
-  // Avoid listing the store so we never accidentally read a duplicate suffix blob.
-  const now = Date.now();
-  if (!cachedBlobPathname || now >= cacheExpiresAt) {
-    cachedBlobPathname = DATA_BLOB_NAME;
-    cacheExpiresAt = now + 60000;
-  }
-  return cachedBlobPathname;
-};
-
-// Helper: convert various kinds of streams to string
-const streamToString = async (stream) => {
-  if (!stream) return '';
-  // Node.js Readable
-  if (stream instanceof Readable) {
-    return await new Promise((resolve, reject) => {
-      const chunks = [];
-      stream.on('data', (c) => chunks.push(Buffer.isBuffer(c) ? c : Buffer.from(c)));
-      stream.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
-      stream.on('error', reject);
-    });
-  }
-
-  // Web ReadableStream
-  if (typeof stream.getReader === 'function') {
-    const reader = stream.getReader();
-    const chunks = [];
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(Buffer.from(value));
-    }
-    return Buffer.concat(chunks).toString('utf8');
-  }
-
-  // Fallback: try to stringify
-  try {
-    return String(stream);
-  } catch (e) {
-    return '';
-  }
 };
 
 const buildProfileSystemPrompt = (portfolioData, activeProfileId) => {
@@ -237,36 +337,23 @@ const buildProfileSystemPrompt = (portfolioData, activeProfileId) => {
 
 async function getPortfolioData() {
   try {
-    const hasBlobToken = Boolean(process.env.BLOB_READ_WRITE_TOKEN);
-    console.log('[portfolio] load start', { hasBlobToken, isLocalEnv, blobName: DATA_BLOB_NAME });
+    const collection = await getPortfolioCollection();
+    console.log('[portfolio] load start', { hasMongo: Boolean(collection), isLocalEnv, dbName: MONGODB_DB_NAME, collection: PORTFOLIO_COLLECTION });
 
-    if (hasBlobToken) {
-      // Prefer the blob store in every environment so local dev matches Vercel.
-      const blobPathname = await getCachedBlobUrl();
-      if (blobPathname) {
-        try {
-          console.log('[portfolio] attempting blob read', blobPathname);
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 2500);
-
-          const result = await get(blobPathname, { access: 'private', useCache: false, abortSignal: controller.signal });
-          clearTimeout(timeoutId);
-
-          if (result && result.stream) {
-            const text = await streamToString(result.stream);
-            const fetchedData = JSON.parse(text || '{}');
-            // Schema Migration Check
-            if (!fetchedData.profiles || !Array.isArray(fetchedData.profiles)) {
-              console.log("Old schema detected in blob. Dropping and using default multi-profile data.");
-              return defaultData;
-            }
-            console.log('[portfolio] loaded from blob', { activeProfileId: fetchedData.activeProfileId, profileCount: fetchedData.profiles.length });
-            return fetchedData;
-          }
-          console.log('[portfolio] blob read returned no stream');
-        } catch (error) {
-          console.log("Error fetching from blob:", error.message);
+    if (collection) {
+      try {
+        const doc = await collection.findOne({ _id: PORTFOLIO_DOCUMENT_ID });
+        if (doc?.data && Array.isArray(doc.data.profiles)) {
+          console.log('[portfolio] loaded from mongo', { activeProfileId: doc.data.activeProfileId, profileCount: doc.data.profiles.length });
+          return doc.data;
         }
+        if (doc?.data) {
+          console.log('[portfolio] mongo document found but invalid schema');
+        } else {
+          console.log('[portfolio] no mongo document found');
+        }
+      } catch (error) {
+        console.log('Error fetching from mongo:', error.message);
       }
     }
 
@@ -278,11 +365,36 @@ async function getPortfolioData() {
         return defaultData;
       }
       console.log('[portfolio] loaded local file', { activeProfileId: fetchedData.activeProfileId, profileCount: fetchedData.profiles.length });
+      if (collection) {
+        try {
+          await collection.updateOne(
+            { _id: PORTFOLIO_DOCUMENT_ID },
+            { $set: { data: fetchedData, updatedAt: new Date() } },
+            { upsert: true }
+          );
+          console.log('[portfolio] seeded mongo from local file');
+        } catch (error) {
+          console.log('Error seeding mongo from local file:', error.message);
+        }
+      }
       return fetchedData;
     }
 
     console.log('[portfolio] loading bundled data');
-    return readBundledPortfolioData();
+    const bundledData = readBundledPortfolioData();
+    if (collection) {
+      try {
+        await collection.updateOne(
+          { _id: PORTFOLIO_DOCUMENT_ID },
+          { $set: { data: bundledData, updatedAt: new Date() } },
+          { upsert: true }
+        );
+        console.log('[portfolio] seeded mongo from bundled data');
+      } catch (error) {
+        console.log('Error seeding mongo from bundled data:', error.message);
+      }
+    }
+    return bundledData;
   } catch (error) {
     console.log("Error in getPortfolioData:", error.message);
   }
@@ -304,23 +416,35 @@ app.get("/api/portfolio", async (req, res) => {
   }
 });
 
+app.get('/api/resume/:fileId', async (req, res) => {
+  try {
+    const served = await streamGridFsFile(req.params.fileId, req, res);
+    if (!served) {
+      return res.status(404).json({ error: 'Resume file not found' });
+    }
+  } catch (error) {
+    console.error('Resume download error:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Failed to load resume file' });
+    }
+  }
+});
+
 // Dev-only helper: allow saving portfolio without Auth0 when running locally.
 app.post("/api/portfolio/debug-save", async (req, res) => {
   try {
     if (!isLocalEnv) return res.status(403).json({ error: 'Forbidden' });
     const newData = req.body;
 
-    if (process.env.BLOB_READ_WRITE_TOKEN) {
-      const blob = await put(DATA_BLOB_NAME, JSON.stringify(newData), {
-        access: 'private',
-        allowOverwrite: true,
-        addRandomSuffix: false,
-        contentType: 'application/json',
-      });
-      cachedBlobPathname = DATA_BLOB_NAME;
-      cacheExpiresAt = Date.now() + 60000;
-      console.log('Dev: portfolio data saved to blob:', cachedBlobPathname);
-      return res.json({ success: true, message: 'Saved to blob', data: newData, blob });
+    const collection = await getPortfolioCollection();
+    if (collection) {
+      await collection.updateOne(
+        { _id: PORTFOLIO_DOCUMENT_ID },
+        { $set: { data: newData, updatedAt: new Date() } },
+        { upsert: true }
+      );
+      console.log('Dev: portfolio data saved to mongo:', MONGODB_DB_NAME, PORTFOLIO_COLLECTION);
+      return res.json({ success: true, message: 'Saved to mongo', data: newData });
     }
 
     fs.writeFileSync(LOCAL_DATA_PATH, JSON.stringify(newData, null, 2));
@@ -336,27 +460,22 @@ app.post("/api/portfolio", checkJwt, requireAdmin, async (req, res) => {
   try {
     const newData = req.body;
 
-    if (!process.env.BLOB_READ_WRITE_TOKEN) {
-      if (isLocalEnv) {
-        fs.writeFileSync(LOCAL_DATA_PATH, JSON.stringify(newData, null, 2));
-        return res.json({ success: true, message: "Data updated locally", data: newData });
-      }
-      return res.status(500).json({ error: "Vercel Blob token not configured" });
+    const collection = await getPortfolioCollection();
+    if (collection) {
+      await collection.updateOne(
+        { _id: PORTFOLIO_DOCUMENT_ID },
+        { $set: { data: newData, updatedAt: new Date() } },
+        { upsert: true }
+      );
+      console.log('Portfolio data saved to mongo:', MONGODB_DB_NAME, PORTFOLIO_COLLECTION);
+      return res.json({ success: true, message: "Data updated successfully", data: newData });
     }
-    
-    const blob = await put(DATA_BLOB_NAME, JSON.stringify(newData), {
-      access: 'private',
-      allowOverwrite: true,
-      addRandomSuffix: false,
-      contentType: 'application/json',
-    });
-    
-    // Keep the cache pointed at the one fixed profile blob pathname.
-    cachedBlobPathname = DATA_BLOB_NAME;
-    cacheExpiresAt = Date.now() + 60000; // Cache for 1 minute
-    console.log('Portfolio data saved to blob:', cachedBlobPathname);
-    
-    res.json({ success: true, message: "Data updated successfully", data: newData, blob });
+
+    if (isLocalEnv) {
+      fs.writeFileSync(LOCAL_DATA_PATH, JSON.stringify(newData, null, 2));
+      return res.json({ success: true, message: "Data updated locally", data: newData });
+    }
+    return res.status(500).json({ error: "MongoDB not configured" });
   } catch (error) {
     console.error("Error saving data:", error);
     res.status(500).json({ error: "Failed to save portfolio data" });
@@ -371,6 +490,13 @@ app.post("/api/upload", checkJwt, requireAdmin, async (req, res) => {
       return res.status(400).send('No files were uploaded.');
     }
     const file = req.files.file;
+
+    if (file.mimetype === 'application/pdf') {
+      const storedResume = await uploadResumePdfToMongo(file);
+      if (storedResume) {
+        return res.json({ url: storedResume.url, fileId: storedResume.fileId });
+      }
+    }
 
     if (isLocalEnv) {
       const uploadDir = path.join(__dirname, 'uploads');
@@ -409,14 +535,21 @@ app.post("/api/parse-resume", checkJwt, requireAdmin, async (req, res) => {
     
     // 1. Upload file
     let url = "";
-    if (isLocalEnv) {
+    if (file.mimetype === 'application/pdf') {
+      const storedResume = await uploadResumePdfToMongo(file);
+      if (storedResume) {
+        url = storedResume.url;
+      }
+    }
+
+    if (!url && isLocalEnv) {
       const uploadDir = path.join(__dirname, 'uploads');
       if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
       const safeName = Date.now() + '-' + file.name.replace(/\s+/g, '_');
       const filePath = path.join(uploadDir, safeName);
       await file.mv(filePath);
       url = `http://localhost:${PORT}/uploads/${safeName}`;
-    } else {
+    } else if (!url) {
       if (!process.env.BLOB_READ_WRITE_TOKEN) {
         return res.status(500).json({ error: "Vercel Blob token not configured" });
       }
