@@ -11,19 +11,23 @@ export const PortfolioProvider = ({ children }) => {
   const PORTFOLIO_REQUEST_TIMEOUT_MS = 4000;
 
   const fallbackData = {
-    activeProfileId: "fallback-profile",
+    activeProfileId: "default-1",
     profiles: [
       {
-        id: "fallback-profile",
-        name: "Portfolio Admin",
-        roles: ["Full Stack Developer"],
+        id: "default-1",
+        name: "Data Engineer",
+        roles: [
+          "Data Scientist",
+          "Data Engineer",
+          "Full Stack Developer"
+        ],
         avatarUrl: "",
         resumeUrl: "",
-        experienceBio: "Fallback portfolio data loaded while the API is unavailable.",
+        experienceBio: "",
         projects: [],
-        systemPrompt: "You are an AI assistant for this portfolio.",
-        resumeText: "",
-      },
+        systemPrompt: "You are Goutham's AI assistant. Answer questions about his 4+ years of data engineering experience, projects, skills in Apache NiFi, Kafka, Python, SQL, Power BI, and Tableau. Be professional, concise, and default to 80-120 words unless the user asks for more detail.",
+        resumeText: ""
+      }
     ],
     menuVisibility: {
       Home: true,
@@ -33,6 +37,7 @@ export const PortfolioProvider = ({ children }) => {
     },
     chatbot: {
       model: "nvidia/nemotron-3-super-120b-a12b:free",
+      systemPrompt: "You are Goutham's AI assistant. Answer questions about his 4+ years of data engineering experience, projects, skills in Apache NiFi, Kafka, Python, SQL, Power BI, and Tableau. Be professional, concise, and default to 80-120 words unless the user asks for more detail."
     },
   };
 

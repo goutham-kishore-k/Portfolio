@@ -50,6 +50,11 @@ const AdminDashboard = () => {
     setMessage(null);
     try {
       let models = [];
+      const isFreeModel = (model) => {
+        const promptPrice = Number(model?.pricing?.prompt);
+        const completionPrice = Number(model?.pricing?.completion);
+        return Number.isFinite(promptPrice) && Number.isFinite(completionPrice) && promptPrice === 0 && completionPrice === 0;
+      };
 
       try {
         const res = await axios.post(
@@ -75,8 +80,8 @@ const AdminDashboard = () => {
           const publicRes = await axios.get("https://openrouter.ai/api/v1/models");
           models = Array.isArray(publicRes.data?.data)
             ? publicRes.data.data
-                .map((model) => ({ id: model.id, name: model.name || model.id }))
-                .filter((model) => model.id)
+                .map((model) => ({ id: model.id, name: model.name || model.id, pricing: model.pricing }))
+                .filter((model) => model.id && isFreeModel(model))
                 .sort((a, b) => a.id.localeCompare(b.id))
             : [];
         }

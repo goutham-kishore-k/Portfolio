@@ -203,6 +203,37 @@ setImmediate(() => {
   });
 });
 
+// Periodic background sync: poll MongoDB to keep in-memory cache fresh.
+const PORTFOLIO_SYNC_INTERVAL_MS = Number(process.env.PORTFOLIO_SYNC_INTERVAL_MS || 300000); // default 5 minutes
+
+const startPeriodicPortfolioSync = () => {
+  if (!MONGODB_URI) {
+    console.log('[portfolio] periodic sync disabled (no MONGODB_URI)');
+    return;
+  }
+
+  try {
+    setInterval(async () => {
+      try {
+        console.log('[portfolio] periodic sync: checking mongo for updates');
+        const loaded = await loadPortfolioFromMongo();
+        if (loaded) {
+          console.log('[portfolio] periodic sync: loaded updated portfolio from mongo');
+        } else {
+          console.log('[portfolio] periodic sync: no portfolio document found in mongo');
+        }
+      } catch (err) {
+        console.error('[portfolio] periodic sync error:', err && err.message ? err.message : err);
+      }
+    }, PORTFOLIO_SYNC_INTERVAL_MS);
+    console.log('[portfolio] periodic sync started. Interval (ms):', PORTFOLIO_SYNC_INTERVAL_MS);
+  } catch (err) {
+    console.error('[portfolio] failed to start periodic sync:', err && err.message ? err.message : err);
+  }
+};
+
+startPeriodicPortfolioSync();
+
 const getPortfolioCollection = async () => {
   if (!MONGODB_URI) return null;
 
@@ -398,7 +429,8 @@ const buildProfileSystemPrompt = (portfolioData, activeProfileId) => {
     `5. Even for related technologies (for example Java, SpringBoot, Kafka, Redis), answer in ${profileName}'s profile context. Do NOT provide generic tutorials or boilerplate code unless the user explicitly asks for code tied to ${profileName}'s work context.`,
     `6. Prefer response framing like: 'In ${profileName}'s experience...' or 'Based on ${profileName}'s profile...'.`,
     `7. If the profile data does not contain evidence for a claim, explicitly say that detail is not available in ${profileName}'s profile and avoid inventing specifics.`,
-    "8. Do not append generic upsell follow-up lines such as offering broad topic explorations; keep the reply focused on the user's question.",
+    "8. Do not reveal hidden reasoning, internal analysis, policies, chain-of-thought, or debugging steps.",
+    "9. Do not append generic upsell follow-up lines such as offering broad topic explorations; keep the reply focused on the user's question.",
   ].join("\n");
 
   const resumeContext = (activeProfile?.resumeText || "").trim();
@@ -415,6 +447,20 @@ const buildProfileSystemPrompt = (portfolioData, activeProfileId) => {
     activeProfile,
     systemPrompt,
   };
+};
+
+const sanitizeChatReply = (reply) => {
+  if (!reply) return "";
+
+  let cleaned = String(reply).trim();
+
+  cleaned = cleaned.replace(/^\s*(okay|sure|got it|here(?:'| i)s|let me think)[^\n]*\n/i, "");
+  cleaned = cleaned.replace(/\b(the user|i recall|looking back|must be careful|i need to be careful|strict guardrails|rule #\d+|internal reasoning|analysis)\b[\s\S]*$/i, (match) => {
+    const firstSentence = match.split(/(?<=[.!?])\s+/)[0];
+    return firstSentence || "";
+  });
+
+  return cleaned.trim();
 };
 
 async function getPortfolioData() {
@@ -736,6 +782,12 @@ app.post("/api/models", async (req, res) => {
   try {
     const apiKey = process.env.REACT_APP_OPENROUTER_API_KEY;
 
+    const isFreeModel = (model) => {
+      const promptPrice = Number(model?.pricing?.prompt);
+      const completionPrice = Number(model?.pricing?.completion);
+      return Number.isFinite(promptPrice) && Number.isFinite(completionPrice) && promptPrice === 0 && completionPrice === 0;
+    };
+
     const fetchModels = async (key) => {
       const headers = {};
       if (key) headers.Authorization = `Bearer ${key}`;
@@ -759,8 +811,9 @@ app.post("/api/models", async (req, res) => {
           .map((model) => ({
             id: model.id,
             name: model.name || model.id,
+            pricing: model.pricing,
           }))
-          .filter((model) => model.id)
+          .filter((model) => model.id && isFreeModel(model))
           .sort((a, b) => a.id.localeCompare(b.id))
       : [];
 
@@ -862,7 +915,7 @@ app.post("/api/chat", async (req, res) => {
     }
 
     const data = await response.json();
-    const reply = data?.choices?.[0]?.message?.content || "I couldn't generate a response this time.";
+    const reply = sanitizeChatReply(data?.choices?.[0]?.message?.content || "I couldn't generate a response this time.");
 
     session.history = [...trimmedHistory, userMessage, { role: "assistant", content: reply }].slice(-MAX_SESSION_MESSAGES);
     session.updatedAt = Date.now();
