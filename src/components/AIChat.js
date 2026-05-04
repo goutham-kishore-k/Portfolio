@@ -4,9 +4,7 @@ import {
   AiOutlineSend,
   AiOutlineRobot,
   AiOutlineClose,
-  AiOutlineDownload,
   AiOutlineLink,
-  AiOutlineFileText,
 } from "react-icons/ai";
 import { FiGithub } from "react-icons/fi";
 import { PortfolioContext } from "../context/PortfolioContext";
