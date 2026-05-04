@@ -6,8 +6,8 @@ import { PortfolioContext } from "../../context/PortfolioContext";
 function AboutCard() {
   const { activeProfile } = useContext(PortfolioContext);
   const summary = activeProfile?.experienceBio;
-  const summaryTitle = activeProfile?.name || "Professional Summary";
-  const roles = activeProfile?.roles || [];
+  const summaryTitle = "Professional Summary";
+  //const roles = activeProfile?.roles || [];
 
   return (
     <Card className="quote-card-view">
@@ -16,11 +16,11 @@ function AboutCard() {
           {summary ? (
             <>
               <h2 style={{ color: "white", fontSize: "2.2rem", marginBottom: "14px" }}>{summaryTitle}</h2>
-              {roles.length > 0 && (
+              {/* {roles.length > 0 && (
                 <p style={{ color: "#c770f0", fontSize: "1rem", marginBottom: "22px", fontWeight: 600 }}>
                   {roles.join(" · ")}
                 </p>
-              )}
+              )} */}
               <div
                 style={{
                   textAlign: "justify",
@@ -51,25 +51,13 @@ function AboutCard() {
               supporting ML initiatives, and delivering data-driven insights that enable strategic decision-making.
               <br />
               <br />
-              other interests 😋:
             </p>
           )}
-          <ul style={{ marginTop: "22px" }}>
-            <li className="about-activity">
-              <ImPointRight /> Playing Outdoor Games
-            </li>
-            <li className="about-activity">
-              <ImPointRight />TO-DO: Writing Tech Blogs
-            </li>
-            <li className="about-activity">
-              <ImPointRight /> Travelling
-            </li>
-          </ul>
 
           <p style={{ color: "rgb(155 126 172)", marginTop: "18px" }}>
             "It is always IMpossible until it's DONE!"{" "}
           </p>
-          <footer className="blockquote-footer">Goutham</footer>
+          {/* <footer className="blockquote-footer">Goutham</footer> */}
         </blockquote>
       </Card.Body>
     </Card>

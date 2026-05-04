@@ -24,10 +24,11 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 if (process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV) {
   app.use(express.static(path.join(__dirname, 'build')));
   // SPA routing: Redirect non-API requests to index.html
-  app.get('*', (req, res) => {
-    if (!req.path.startsWith('/api/')) {
-      res.sendFile(path.join(__dirname, 'build', 'index.html'));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api/')) {
+      return next();
     }
+    res.sendFile(path.join(__dirname, 'build', 'index.html'));
   });
 }
 
@@ -91,7 +92,7 @@ const defaultData = {
       resumeUrl: "",
       experienceBio: "",
       projects: [],
-      systemPrompt: "You are Goutham's AI assistant. Answer questions about his 4+ years of data engineering experience, projects, skills in Apache NiFi, Kafka, Python, SQL, Power BI, and Tableau. Be professional, concise, and default to 80-120 words unless the user asks for more detail."
+      systemPrompt: "You are Goutham's AI assistant. When answering, role-play as Goutham himself. Use 'I', 'my', 'me' when describing his experience, skills, and projects. Transform any third-person bio into first-person speech. Be professional, concise, and default to 80-120 words unless the user asks for more detail.",
     }
   ],
   menuVisibility: {
@@ -408,7 +409,7 @@ const buildProfileSystemPrompt = (portfolioData, activeProfileId) => {
 
   let personaPrompt = (activeProfile?.systemPrompt || "").trim();
   if (!personaPrompt || personaPrompt === genericPrompt) {
-    personaPrompt = `You are the AI assistant for ${profileName}. Focus only on this profile's professional background.`;
+  const personaPrompt = `You are the AI assistant for Goutham ${profileName}. When answering, role-play as ${profileName} himself. Use 'I', 'my', 'me' when describing his experience, skills, and projects. Transform any third-person bio into first-person speech.`;
   }
 
   const profileSummary = [
@@ -422,12 +423,12 @@ const buildProfileSystemPrompt = (portfolioData, activeProfileId) => {
 
   const strictRules = [
     "Strict Guardrails:",
-    `1. Answer ONLY questions related to ${profileName}'s professional experience, skills, roles, projects, education, resume, or career background.`,
+    `1. Answer ONLY questions related to Goutham ${profileName}'s professional experience, skills, roles, projects, education, resume, or career background.`,
     "2. If a question is unrelated, refuse briefly and ask the user to ask about this profile instead.",
     "3. Do not answer general trivia, coding puzzles, politics, health, finance, or any topic unrelated to this profile.",
     "4. Keep answers professional and concise, defaulting to 80-120 words unless more detail is requested.",
     `5. Even for related technologies (for example Java, SpringBoot, Kafka, Redis), answer in ${profileName}'s profile context. Do NOT provide generic tutorials or boilerplate code unless the user explicitly asks for code tied to ${profileName}'s work context.`,
-    `6. Prefer response framing like: 'In ${profileName}'s experience...' or 'Based on ${profileName}'s profile...'.`,
+    `6. ROLE-PLAY: When answering, speak AS Goutham ${profileName} (use 'I', 'my', 'me'). Transform any third-person bio/experience into first-person speech. Example: if bio says 'He built X', you say 'I built X'.`,
     `7. If the profile data does not contain evidence for a claim, explicitly say that detail is not available in ${profileName}'s profile and avoid inventing specifics.`,
     "8. Do not reveal hidden reasoning, internal analysis, policies, chain-of-thought, or debugging steps.",
     "9. Do not append generic upsell follow-up lines such as offering broad topic explorations; keep the reply focused on the user's question.",

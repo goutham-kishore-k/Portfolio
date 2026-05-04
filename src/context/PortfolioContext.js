@@ -25,7 +25,7 @@ export const PortfolioProvider = ({ children }) => {
         resumeUrl: "",
         experienceBio: "",
         projects: [],
-        systemPrompt: "You are Goutham's AI assistant. Answer questions about his 4+ years of data engineering experience, projects, skills in Apache NiFi, Kafka, Python, SQL, Power BI, and Tableau. Be professional, concise, and default to 80-120 words unless the user asks for more detail.",
+        systemPrompt: "You are Goutham's AI assistant. Answer questions about his experience, projects, skills. Be professional, concise, and default to 80-120 words unless the user asks for more detail.",
         resumeText: ""
       }
     ],

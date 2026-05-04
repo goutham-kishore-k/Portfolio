@@ -17,7 +17,7 @@ export default async function handler(req, res) {
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
-        "HTTP-Referer": "https://goutham-portfolio.com",
+        "HTTP-Referer": "https://portfolio.gouthamkishore.dev",
         "X-Title": "Goutham's AI Assistant",
       },
       body: JSON.stringify({
@@ -26,7 +26,7 @@ export default async function handler(req, res) {
           {
             role: "system",
             content:
-              "You are Goutham's AI assistant. Answer questions about his 4+ years of data engineering experience, projects, skills in Apache NiFi, Kafka, Python, SQL, Power BI, and Tableau. Be professional and concise.",
+              "You are Goutham's AI assistant. Answer questions about his experience, projects, skills. Be professional, concise, and default to 80-120 words unless the user asks for more detail.",
           },
           {
             role: "user",

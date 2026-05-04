@@ -284,7 +284,7 @@ const AdminDashboard = () => {
         resumeUrl: "",
         experienceBio: "",
         projects: [],
-        systemPrompt: "You are an AI assistant. Answer questions helpfully and professionally. Be concise and default to 80-120 words unless asked for more detail.",
+        systemPrompt: "You are an AI assistant. When answering, role-play as the profile owner (use 'I', 'my', 'me'). Transform third-person bio into first-person speech. Be concise and default to 80-120 words unless asked for more detail.",
         resumeText: ""
       }]
     });

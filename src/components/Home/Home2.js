@@ -58,8 +58,9 @@ function Home2() {
   const projects = activeProfile?.projects || [];
   const summaryText = introBio
     ? stripHtml(introBio)
-    : "I fell in love with Data Engineering and transforming raw data into actionable insights. I build production-grade pipelines, ETL/ELT workflows, and analytics solutions that turn data into decisions.";
-  const shortSummary = summaryText.length > 260 ? `${summaryText.slice(0, 260).trim()}...` : summaryText;
+    : "I love transforming raw data into actionable insights. I build production-grade pipelines, ETL/ELT workflows, and analytics solutions that turn data into decisions.";
+  // Create a short version (max 200 chars) for the home page
+  const shortSummary = summaryText.length > 200 ? `${summaryText.slice(0, 200).trim()}...` : summaryText;
   const highlightedSummary = highlightKeywords(shortSummary, [
     ...DEFAULT_KEYWORDS,
     ...(activeProfile?.roles || []),
@@ -76,9 +77,9 @@ function Home2() {
             <p className="home-about-body" style={{ lineHeight: 1.8 }}>
               {highlightedSummary}
             </p>
-            <p className="home-about-body" style={{ marginTop: "18px", opacity: 0.95 }}>
+            {/* <p className="home-about-body" style={{ marginTop: "18px", opacity: 0.95 }}>
               Focus areas: <b className="purple">{(activeProfile?.roles || ["Data Engineer"]).join(" · ")}</b>
-            </p>
+            </p> */}
           </Col>
           <Col md={4} className="myAvtar">
             <Tilt>
@@ -93,13 +94,13 @@ function Home2() {
         </Row>
         <Row className="mb-5">
         <Col md={10} className="home-about-description">
-          <p className="home-about-body">
+          {/* <p className="home-about-body">
             Curious to learn more about me and the tools I've worked with? Check out my <a href="/about" className="purple">About</a> page.
             <br />
             Want to explore what I'm currently working on? Visit my <a href="/project" className="purple">Projects</a>.
             <br />
             Looking for my professional details? Download my <a href="/resume" className="purple">Resume</a>.
-          </p>
+          </p> */}
         </Col>
         </Row>
 

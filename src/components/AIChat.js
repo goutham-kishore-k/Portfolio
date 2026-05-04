@@ -27,7 +27,7 @@ const AIChat = () => {
         "Summarize his experience",
         "Show recent projects",
         "What impact has he delivered?",
-        "Download 1-page resume",
+        // "Download 1-page resume",
       ],
     },
   ]);
@@ -54,12 +54,11 @@ const AIChat = () => {
       {
         id: "ai-1",
         type: "ai",
-        content: `Hi, I am ${activeProfile?.name || "Goutham"}'s AI assistant. Ask me about this profile's experience, skills, and projects.`,
+        content: `Hi, I am Goutham's AI assistant. Ask me about this profile's experience, skills, and projects.`,
         suggestions: [
           "Summarize his experience",
           "Show recent projects",
           "What impact has he delivered?",
-          "Download 1-page resume",
         ],
       },
     ]);
@@ -67,8 +66,8 @@ const AIChat = () => {
 
   const quickActions = useMemo(
     () => [
-      { key: "resume1", label: "1-Page Resume", icon: <AiOutlineDownload /> },
-      { key: "resume2", label: "2-Page Resume", icon: <AiOutlineFileText /> },
+      //{ key: "resume1", label: "1-Page Resume", icon: <AiOutlineDownload /> },
+      //{ key: "resume2", label: "2-Page Resume", icon: <AiOutlineFileText /> },
       { key: "linkedin", label: "LinkedIn", icon: <AiOutlineLink /> },
       { key: "github", label: "GitHub", icon: <FiGithub /> },
     ],
