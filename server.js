@@ -139,6 +139,13 @@ const DEFAULT_BACKUP_MODELS = [
   "gpt-3.5-turbo", // OpenAI fallback (if available)
 ];
 
+const REASONING_MODELS = new Set([
+  "nvidia/nemotron-3-super-120b-a12b:free",
+  "openai/gpt-oss-20b:free",
+]);
+
+const supportsReasoning = (model) => REASONING_MODELS.has(model);
+
 // Helper function to call OpenRouter API with automatic fallback to backup models
 const callOpenRouterWithFallback = async (primaryModel, requestBody, apiKey, backupModels = DEFAULT_BACKUP_MODELS, headers = {}) => {
   const modelsToTry = [primaryModel, ...backupModels];
@@ -159,6 +166,7 @@ const callOpenRouterWithFallback = async (primaryModel, requestBody, apiKey, bac
         body: JSON.stringify({
           ...requestBody,
           model,
+          ...(supportsReasoning(model) ? { reasoning: { enabled: true } } : {}),
         }),
       });
 
@@ -538,11 +546,16 @@ const sanitizeChatReply = (reply) => {
 
   let cleaned = String(reply).trim();
 
-  cleaned = cleaned.replace(/^\s*(okay|sure|got it|here(?:'| i)s|let me think)[^\n]*\n/i, "");
-  cleaned = cleaned.replace(/\b(the user|i recall|looking back|must be careful|i need to be careful|strict guardrails|rule #\d+|internal reasoning|analysis)\b[\s\S]*$/i, (match) => {
-    const firstSentence = match.split(/(?<=[.!?])\s+/)[0];
-    return firstSentence || "";
-  });
+  cleaned = cleaned
+    .replace(/<think>[\s\S]*?<\/think>/gi, "")
+    .replace(/^\s*(?:thinking|analysis|internal reasoning|reasoning)\s*[:\-]\s*[\s\S]*?(?:\n\n|$)/i, "")
+    .replace(/^\s*(okay|sure|got it|here(?:'| i)s|let me think)[^\n]*\n/i, "")
+    .replace(/\b(the user|i recall|looking back|must be careful|i need to be careful|strict guardrails|rule #\d+|internal reasoning|analysis)\b[\s\S]*$/i, (match) => {
+      const firstSentence = match.split(/(?<=[.!?])\s+/)[0];
+      return firstSentence || "";
+    })
+    .replace(/^\s*(?:thinking|analysis|internal reasoning|reasoning)\s*[:\-].*$/gim, "")
+    .replace(/\n{3,}/g, "\n\n");
 
   return cleaned.trim();
 };
@@ -998,13 +1011,20 @@ app.post("/api/chat", async (req, res) => {
       }
 
       const data = result.data;
-      const reply = sanitizeChatReply(data?.choices?.[0]?.message?.content || "I couldn't generate a response this time.");
+      const rawReply = data?.choices?.[0]?.message?.content || "I couldn't generate a response this time.";
+      const reasoningDetails = data?.choices?.[0]?.message?.reasoning_details;
+      console.log("🧠 Raw chat response:", String(rawReply).slice(0, 2000));
+      const reply = sanitizeChatReply(rawReply);
 
-      session.history = [...trimmedHistory, userMessage, { role: "assistant", content: reply }].slice(-MAX_SESSION_MESSAGES);
+      session.history = [...trimmedHistory, userMessage, {
+        role: "assistant",
+        content: reply,
+        ...(reasoningDetails ? { reasoning_details: reasoningDetails } : {}),
+      }].slice(-MAX_SESSION_MESSAGES);
       session.updatedAt = Date.now();
       chatSessions.set(sessionId, session);
 
-      res.status(200).json({ reply, sessionId, profileId, profileName, model: result.usedModel });
+      res.status(200).json({ reply, sessionId, profileId, profileName, model: result.usedModel, reasoning_details: reasoningDetails });
     } catch (fallbackError) {
       clearTimeout(timeout);
       if (fallbackError?.message?.includes('aborted')) {

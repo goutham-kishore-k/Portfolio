@@ -4,6 +4,32 @@ const DEFAULT_BACKUP_MODELS = [
   "gpt-3.5-turbo",
 ];
 
+const REASONING_MODELS = new Set([
+  "nvidia/nemotron-3-super-120b-a12b:free",
+  "openai/gpt-oss-20b:free",
+]);
+
+const supportsReasoning = (model) => REASONING_MODELS.has(model);
+
+const sanitizeChatReply = (reply) => {
+  if (!reply) return "";
+
+  let cleaned = String(reply).trim();
+
+  cleaned = cleaned
+    .replace(/<think>[\s\S]*?<\/think>/gi, "")
+    .replace(/^\s*(?:thinking|analysis|internal reasoning|reasoning)\s*[:\-]\s*[\s\S]*?(?:\n\n|$)/i, "")
+    .replace(/^\s*(okay|sure|got it|here(?:'| i)s|let me think)[^\n]*\n/i, "")
+    .replace(/\b(the user|i recall|looking back|must be careful|i need to be careful|strict guardrails|rule #\d+|internal reasoning|analysis)\b[\s\S]*$/i, (match) => {
+      const firstSentence = match.split(/(?<=[.!?])\s+/)[0];
+      return firstSentence || "";
+    })
+    .replace(/^\s*(?:thinking|analysis|internal reasoning|reasoning)\s*[:\-].*$/gim, "")
+    .replace(/\n{3,}/g, "\n\n");
+
+  return cleaned.trim();
+};
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     res.status(405).json({ error: "Method not allowed" });
@@ -61,6 +87,7 @@ export default async function handler(req, res) {
               content: message,
             },
           ],
+          ...(supportsReasoning(model) ? { reasoning: { enabled: true } } : {}),
           temperature: 0.7,
           max_tokens: 500,
         }),
@@ -88,9 +115,12 @@ export default async function handler(req, res) {
       }
 
       const data = await response.json();
-      const reply = data.choices[0].message.content;
+      const rawReply = data.choices[0].message.content;
+      const reasoningDetails = data?.choices?.[0]?.message?.reasoning_details;
+      console.log(`🧠 Raw chat response from ${model}:`, String(rawReply).slice(0, 2000));
+      const reply = sanitizeChatReply(rawReply);
 
-      return res.status(200).json({ reply, model });
+      return res.status(200).json({ reply, model, reasoning_details: reasoningDetails });
 
     } catch (error) {
       console.error(`❌ Model ${model} error:`, error.message);
