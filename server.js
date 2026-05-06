@@ -290,11 +290,6 @@ const bootstrapPortfolioCache = async () => {
   return portfolioBootstrapPromise;
 };
 
-// Trigger bootstrap immediately on startup
-bootstrapPortfolioCache().catch((error) => {
-  console.error('[portfolio] bootstrap unexpected error:', error.message);
-});
-
 // Periodic background sync: poll MongoDB to keep in-memory cache fresh.
 const PORTFOLIO_SYNC_INTERVAL_MS = Number(process.env.PORTFOLIO_SYNC_INTERVAL_MS || 300000); // default 5 minutes
 
@@ -324,8 +319,6 @@ const startPeriodicPortfolioSync = () => {
   }
 };
 
-startPeriodicPortfolioSync();
-
 const getPortfolioCollection = async () => {
   if (!MONGODB_URI) return null;
 
@@ -353,6 +346,13 @@ const getPortfolioCollection = async () => {
   const client = await mongoClientPromise;
   return client.db(MONGODB_DB_NAME).collection(PORTFOLIO_COLLECTION);
 };
+
+// Trigger bootstrap immediately on startup after Mongo helpers are initialized.
+bootstrapPortfolioCache().catch((error) => {
+  console.error('[portfolio] bootstrap unexpected error:', error.message);
+});
+
+startPeriodicPortfolioSync();
 
 const getMongoDb = async () => {
   if (!MONGODB_URI) return null;
