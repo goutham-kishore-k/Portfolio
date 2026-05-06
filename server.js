@@ -198,10 +198,9 @@ const bootstrapPortfolioCache = async () => {
   return portfolioBootstrapPromise;
 };
 
-setImmediate(() => {
-  bootstrapPortfolioCache().catch((error) => {
-    console.error('[portfolio] bootstrap unexpected error:', error.message);
-  });
+// Trigger bootstrap immediately on startup
+bootstrapPortfolioCache().catch((error) => {
+  console.error('[portfolio] bootstrap unexpected error:', error.message);
 });
 
 // Periodic background sync: poll MongoDB to keep in-memory cache fresh.
@@ -466,10 +465,11 @@ const sanitizeChatReply = (reply) => {
 
 async function getPortfolioData() {
   try {
-    if (!portfolioBootstrapPromise) {
-      bootstrapPortfolioCache().catch((error) => {
-        console.error('[portfolio] bootstrap trigger failed:', error.message);
-      });
+    // Ensure bootstrap has completed before returning cache
+    if (portfolioBootstrapPromise) {
+      await portfolioBootstrapPromise;
+    } else {
+      await bootstrapPortfolioCache();
     }
 
     console.log('[portfolio] returning cache', {
@@ -482,7 +482,7 @@ async function getPortfolioData() {
     getPortfolioData.lastUpdatedAt = portfolioCacheUpdatedAt;
     return portfolioCache || defaultData;
   } catch (error) {
-    console.log("Error in getPortfolioData:", error.message);
+    console.error('[portfolio] Error in getPortfolioData:', error.message);
   }
   return readBundledPortfolioData();
 }
