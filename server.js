@@ -102,7 +102,12 @@ const defaultData = {
     Resume: true
   },
   chatbot: {
-    model: process.env.OPENROUTER_MODEL || "nvidia/nemotron-3-super-120b-a12b:free"
+    model: process.env.OPENROUTER_MODEL || "nvidia/nemotron-3-super-120b-a12b:free",
+    backupModels: [
+      "meta-llama/llama-2-70b-chat",
+      "mistralai/mistral-7b-instruct",
+      "gpt-3.5-turbo"
+    ]
   }
 };
 
@@ -124,6 +129,85 @@ const pruneExpiredChatSessions = () => {
       chatSessions.delete(sessionId);
     }
   }
+};
+
+// Backup models for fallback if primary model fails or is rate-limited
+// Default models if not configured in portfolio settings
+const DEFAULT_BACKUP_MODELS = [
+  "meta-llama/llama-2-70b-chat", // High-quality open-source LLM
+  "mistralai/mistral-7b-instruct", // Lightweight but capable alternative
+  "gpt-3.5-turbo", // OpenAI fallback (if available)
+];
+
+// Helper function to call OpenRouter API with automatic fallback to backup models
+const callOpenRouterWithFallback = async (primaryModel, requestBody, apiKey, backupModels = DEFAULT_BACKUP_MODELS, headers = {}) => {
+  const modelsToTry = [primaryModel, ...backupModels];
+  let lastError = null;
+
+  for (let i = 0; i < modelsToTry.length; i++) {
+    const model = modelsToTry[i];
+    try {
+      console.log(`🤖 Attempting API call with model: ${model}${i > 0 ? ' (fallback)' : ''}`);
+      
+      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+          ...headers,
+        },
+        body: JSON.stringify({
+          ...requestBody,
+          model,
+        }),
+      });
+
+      // Check for rate limiting (429) or other API errors
+      if (!response.ok) {
+        const error = await response.json();
+        const isRateLimit = response.status === 429;
+        const errorMsg = error.message || error.error?.message || `HTTP ${response.status}`;
+        
+        console.warn(`⚠️  Model ${model} failed: ${errorMsg}${isRateLimit ? ' (rate limited)' : ''}`);
+        
+        // If rate limited or server error, try next model
+        if (isRateLimit || response.status >= 500) {
+          lastError = { status: response.status, message: errorMsg, model };
+          if (i < modelsToTry.length - 1) {
+            console.log(`↪️  Trying backup model...`);
+            continue; // Try next model
+          }
+        }
+        
+        // For client errors (4xx except 429), return immediately
+        return { ok: false, status: response.status, error };
+      }
+
+      // Success - return the response
+      const data = await response.json();
+      if (model !== primaryModel) {
+        console.log(`✅ Fallback model ${model} succeeded`);
+      }
+      return { ok: true, data, usedModel: model };
+
+    } catch (error) {
+      console.error(`❌ Model ${model} error:`, error.message);
+      lastError = error;
+      
+      if (i < modelsToTry.length - 1) {
+        console.log(`↪️  Trying next fallback model...`);
+        continue; // Try next model
+      }
+    }
+  }
+
+  // All models failed
+  console.error(`❌ All models failed. Last error:`, lastError);
+  throw {
+    message: 'All AI models failed. Please try again later.',
+    lastError,
+    attemptedModels: modelsToTry,
+  };
 };
 
 let mongoClient = null;
@@ -697,6 +781,7 @@ app.post("/api/parse-resume", checkJwt, requireAdmin, async (req, res) => {
     const portfolioData = await getPortfolioData();
     const apiKey = process.env.REACT_APP_OPENROUTER_API_KEY;
     const model = portfolioData.chatbot?.model || "nvidia/nemotron-3-super-120b-a12b:free";
+    const backupModels = portfolioData.chatbot?.backupModels || DEFAULT_BACKUP_MODELS;
 
     if (!apiKey) {
       return res.json({ url, error: "API key not configured." });
@@ -738,41 +823,42 @@ You must analyze the text and return a JSON object with exactly this schema:
 
     const abortController = new AbortController();
     const timeout = setTimeout(() => abortController.abort(), 35000);
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
+    
+    try {
+      const result = await callOpenRouterWithFallback(model, requestBody, apiKey, backupModels, {
         "HTTP-Referer": "http://localhost:3000",
         "X-Title": "Goutham's AI Parser",
-      },
-      body: JSON.stringify(requestBody),
-      signal: abortController.signal,
-    });
-    clearTimeout(timeout);
+      });
+      
+      clearTimeout(timeout);
 
-    if (!response.ok) {
-      return res.json({ url, error: "AI API error during parsing." });
+      if (!result.ok) {
+        return res.json({ url, error: "AI API error during parsing." });
+      }
+
+      const aiData = result.data;
+      let reply = aiData.choices[0].message.content.trim();
+      
+      if (reply.startsWith("\`\`\`json")) {
+        reply = reply.replace(/^\`\`\`json/, "").replace(/\`\`\`$/, "").trim();
+      } else if (reply.startsWith("\`\`\`")) {
+        reply = reply.replace(/^\`\`\`/, "").replace(/\`\`\`$/, "").trim();
+      }
+
+      let parsedData = null;
+      try {
+        parsedData = JSON.parse(reply);
+      } catch (e) {
+        console.error("AI returned invalid JSON:", reply);
+        return res.json({ url, error: "AI returned invalid JSON format." });
+      }
+
+      res.json({ url, parsedData, resumeText: resumeText.substring(0, 15000) });
+    } catch (fallbackError) {
+      clearTimeout(timeout);
+      console.error("Parse resume fallback error:", fallbackError);
+      return res.json({ url, error: "Failed to parse resume with AI. Please try again." });
     }
-
-    const aiData = await response.json();
-    let reply = aiData.choices[0].message.content.trim();
-    
-    if (reply.startsWith("\`\`\`json")) {
-      reply = reply.replace(/^\`\`\`json/, "").replace(/\`\`\`$/, "").trim();
-    } else if (reply.startsWith("\`\`\`")) {
-      reply = reply.replace(/^\`\`\`/, "").replace(/\`\`\`$/, "").trim();
-    }
-
-    let parsedData = null;
-    try {
-      parsedData = JSON.parse(reply);
-    } catch (e) {
-      console.error("AI returned invalid JSON:", reply);
-      return res.json({ url, error: "AI returned invalid JSON format." });
-    }
-
-    res.json({ url, parsedData, resumeText: resumeText.substring(0, 15000) });
   } catch (error) {
     console.error("Parse resume error:", error);
     res.status(500).json({ error: "Failed to parse resume" });
@@ -837,6 +923,7 @@ app.post("/api/chat", async (req, res) => {
   const portfolioData = await getPortfolioData();
   const apiKey = process.env.REACT_APP_OPENROUTER_API_KEY;
   const model = portfolioData.chatbot?.model || "nvidia/nemotron-3-super-120b-a12b:free";
+  const backupModels = portfolioData.chatbot?.backupModels || DEFAULT_BACKUP_MODELS;
 
   const { activeProfile, systemPrompt } = buildProfileSystemPrompt(portfolioData, activeProfileId);
   const profileId = activeProfile?.id || "default";
@@ -879,7 +966,6 @@ app.post("/api/chat", async (req, res) => {
     const userMessage = { role: "user", content: String(message).trim() };
 
     const requestBody = {
-      model,
       messages: [
         {
           role: "system",
@@ -894,38 +980,43 @@ app.post("/api/chat", async (req, res) => {
 
     const abortController = new AbortController();
     const timeout = setTimeout(() => abortController.abort(), 25000);
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
+
+    try {
+      const result = await callOpenRouterWithFallback(model, requestBody, apiKey, backupModels, {
         "HTTP-Referer": "http://localhost:3000",
         "X-Title": "Goutham's AI Assistant",
-      },
-      body: JSON.stringify(requestBody),
-      signal: abortController.signal,
-    });
-    clearTimeout(timeout);
-
-    if (!response.ok) {
-      const error = await response.json();
-      return res.status(response.status).json({ 
-        error: error.message || error.error?.message || "API error",
-        details: error 
       });
+
+      clearTimeout(timeout);
+
+      if (!result.ok) {
+        return res.status(result.status).json({ 
+          error: result.error.message || result.error.error?.message || "API error",
+          details: result.error,
+          model: result.usedModel,
+        });
+      }
+
+      const data = result.data;
+      const reply = sanitizeChatReply(data?.choices?.[0]?.message?.content || "I couldn't generate a response this time.");
+
+      session.history = [...trimmedHistory, userMessage, { role: "assistant", content: reply }].slice(-MAX_SESSION_MESSAGES);
+      session.updatedAt = Date.now();
+      chatSessions.set(sessionId, session);
+
+      res.status(200).json({ reply, sessionId, profileId, profileName, model: result.usedModel });
+    } catch (fallbackError) {
+      clearTimeout(timeout);
+      if (fallbackError?.message?.includes('aborted')) {
+        console.error("❌ Chat request timeout");
+        return res.status(504).json({ error: "AI response timeout. Please try again." });
+      }
+      throw fallbackError;
     }
-
-    const data = await response.json();
-    const reply = sanitizeChatReply(data?.choices?.[0]?.message?.content || "I couldn't generate a response this time.");
-
-    session.history = [...trimmedHistory, userMessage, { role: "assistant", content: reply }].slice(-MAX_SESSION_MESSAGES);
-    session.updatedAt = Date.now();
-    chatSessions.set(sessionId, session);
-
-    res.status(200).json({ reply, sessionId, profileId, profileName });
   } catch (error) {
-    console.error("❌ Chat API error:", error.message);
-    res.status(500).json({ error: "Failed to get response: " + error.message });
+    console.error("❌ Chat API error:", error.message || error);
+    const errorMsg = error.message || error.lastError?.message || "Failed to get response";
+    res.status(500).json({ error: errorMsg });
   }
 });
 

@@ -52,7 +52,7 @@ export const PortfolioProvider = ({ children }) => {
       const requestConfig = {
         timeout: PORTFOLIO_REQUEST_TIMEOUT_MS,
         headers: {
-          'Cache-Control': forceRefresh ? 'no-cache' : 'max-age=0',
+          'Cache-Control': forceRefresh ? 'no-cache, no-store, must-revalidate' : 'max-age=0',
           Pragma: forceRefresh ? 'no-cache' : 'max-age=0',
         },
       };
@@ -79,7 +79,7 @@ export const PortfolioProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    fetchData();
+    fetchData(true);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const updateData = (newData) => {
@@ -87,7 +87,7 @@ export const PortfolioProvider = ({ children }) => {
     setLoading(false);
   };
 
-  const refreshData = (forceRefresh = false) => {
+  const refreshData = (forceRefresh = true) => {
     setLoading(true);
     fetchData(forceRefresh);
   };
