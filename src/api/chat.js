@@ -43,16 +43,17 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "API key not configured" });
   }
 
-  // Fetch backup models from portfolio API
+  // Fetch portfolio and backup models from portfolio API for grounding
   let backupModels = DEFAULT_BACKUP_MODELS;
+  let portfolioData = null;
   try {
     const portfolioRes = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/portfolio`);
     if (portfolioRes.ok) {
-      const portfolioData = await portfolioRes.json();
+      portfolioData = await portfolioRes.json();
       backupModels = portfolioData.chatbot?.backupModels || DEFAULT_BACKUP_MODELS;
     }
   } catch (err) {
-    console.warn("Failed to fetch backup models from server:", err.message);
+    console.warn("Failed to fetch portfolio from server:", err.message);
     // Continue with defaults
   }
 
@@ -118,7 +119,26 @@ export default async function handler(req, res) {
       const rawReply = data.choices[0].message.content;
       const reasoningDetails = data?.choices?.[0]?.message?.reasoning_details;
       console.log(`🧠 Raw chat response from ${model}:`, String(rawReply).slice(0, 2000));
-      const reply = sanitizeChatReply(rawReply);
+
+      // Determine active profile from portfolioData if available
+      let activeProfile = null;
+      if (portfolioData && Array.isArray(portfolioData.profiles)) {
+        activeProfile = portfolioData.profiles.find(p => p.id === (portfolioData.activeProfileId || p.id)) || portfolioData.profiles[0];
+      }
+
+      // finalize reply with grounding and banned-phrase filtering
+      const finalizeAssistantReply = (rawReply, activeProfile, fromConversation = false) => {
+        if (!rawReply) return "No evidence available in the provided profile.";
+        let cleaned = sanitizeChatReply(rawReply);
+        cleaned = cleaned.replace(/\b(my knowledge base|i have multiple profiles|this profile exists internally|i maintain multiple profiles|i maintain profiles)\b/ig, "");
+        const hasResume = Boolean(activeProfile && (activeProfile.resumeText || activeProfile.experienceBio || (activeProfile.projects && activeProfile.projects.length)));
+        if (!cleaned || cleaned.length < 3) return 'No evidence available in the provided profile.';
+        if (!hasResume && !fromConversation) return 'No evidence available in the provided profile.';
+        const prefix = (hasResume && !fromConversation) ? 'Based on the provided resume: ' : (fromConversation ? 'From the current conversation: ' : '');
+        return prefix + cleaned;
+      };
+
+      const reply = finalizeAssistantReply(rawReply, activeProfile, false);
 
       return res.status(200).json({ reply, model, reasoning_details: reasoningDetails });
 

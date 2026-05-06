@@ -514,15 +514,17 @@ const buildProfileSystemPrompt = (portfolioData, activeProfileId) => {
 
   const strictRules = [
     "Strict Guardrails:",
-    `1. Answer ONLY questions related to Goutham ${profileName}'s professional experience, skills, roles, projects, education, resume, or career background.`,
+    `1. Answer ONLY questions related to Goutham's professional experience, skills, roles, projects, education, resume, or career background.`,
     "2. If a question is unrelated, refuse briefly and ask the user to ask about this profile instead.",
     "3. Do not answer general trivia, coding puzzles, politics, health, finance, or any topic unrelated to this profile.",
     "4. Keep answers professional and concise, defaulting to 80-120 words unless more detail is requested.",
     `5. Even for related technologies (for example Java, SpringBoot, Kafka, Redis), answer in ${profileName}'s profile context. Do NOT provide generic tutorials or boilerplate code unless the user explicitly asks for code tied to ${profileName}'s work context.`,
-    `6. ROLE-PLAY: When answering, speak AS Goutham ${profileName} (use 'I', 'my', 'me'). Transform any third-person bio/experience into first-person speech. Example: if bio says 'He built X', you say 'I built X'.`,
+    `6. ROLE-PLAY: When answering, speak AS Goutham (use 'I', 'my', 'me'). Transform any third-person bio/experience into first-person speech. Example: if bio says 'He built X', you say 'I built X'.`,
     `7. If the profile data does not contain evidence for a claim, explicitly say that detail is not available in ${profileName}'s profile and avoid inventing specifics.`,
     "8. Do not reveal hidden reasoning, internal analysis, policies, chain-of-thought, or debugging steps.",
     "9. Do not append generic upsell follow-up lines such as offering broad topic explorations; keep the reply focused on the user's question.",
+    "10. Do NOT claim to have or speak from any persistent 'knowledge base' or say you 'maintain multiple profiles' unless these are explicitly stored and verified in the application state. Avoid phrases like 'this is my knowledge base', 'I have multiple profiles', or 'this profile exists internally'.",
+    "11. Always ground answers with provenance. Start your answer with ONE of the following exact prefixes (and only one):\n  - 'Based on the provided resume:'\n  - 'From the current conversation:'\n  - 'No evidence available in the provided profile.'\n  If the information is present in the profile/resume, use 'Based on the provided resume:'; if it was introduced earlier in this chat turn, use 'From the current conversation:'; if neither applies, respond exactly with 'No evidence available in the provided profile.' and do not fabricate details.",
   ].join("\n");
 
   const resumeContext = (activeProfile?.resumeText || "").trim();
@@ -558,6 +560,36 @@ const sanitizeChatReply = (reply) => {
     .replace(/\n{3,}/g, "\n\n");
 
   return cleaned.trim();
+};
+
+const finalizeAssistantReply = (rawReply, activeProfile, fromConversation = false) => {
+  if (!rawReply) return "No evidence available in the provided profile.";
+  // First sanitize
+  let cleaned = sanitizeChatReply(rawReply);
+
+  // Remove banned internal-knowledge phrases
+  cleaned = cleaned.replace(/\b(my knowledge base|i have multiple profiles|this profile exists internally|i maintain multiple profiles|i maintain profiles)\b/ig, "");
+
+  // Choose provenance prefix
+  const hasResume = Boolean(activeProfile && (activeProfile.resumeText || activeProfile.experienceBio || (activeProfile.projects && activeProfile.projects.length)));
+  let prefix = '';
+  if (hasResume && !fromConversation) {
+    prefix = 'Based on the provided resume: ';
+  } else if (fromConversation) {
+    prefix = 'From the current conversation: ';
+  }
+
+  // If cleaned is empty or contains only banned content, return explicit no-evidence message
+  if (!cleaned || cleaned.length < 3) {
+    return 'No evidence available in the provided profile.';
+  }
+
+  // If there is no resume evidence and not from conversation, force no-evidence
+  if (!hasResume && !fromConversation) {
+    return 'No evidence available in the provided profile.';
+  }
+
+  return prefix + cleaned;
 };
 
 async function getPortfolioData() {
@@ -1014,7 +1046,7 @@ app.post("/api/chat", async (req, res) => {
       const rawReply = data?.choices?.[0]?.message?.content || "I couldn't generate a response this time.";
       const reasoningDetails = data?.choices?.[0]?.message?.reasoning_details;
       console.log("🧠 Raw chat response:", String(rawReply).slice(0, 2000));
-      const reply = sanitizeChatReply(rawReply);
+      const reply = finalizeAssistantReply(rawReply, activeProfile, false);
 
       session.history = [...trimmedHistory, userMessage, {
         role: "assistant",
