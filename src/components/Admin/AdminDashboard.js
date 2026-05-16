@@ -24,12 +24,18 @@ const AdminDashboard = () => {
   const [modelsLoading, setModelsLoading] = useState(false);
   const [parsingResume, setParsingResume] = useState(false);
   const [pullingFromMongo, setPullingFromMongo] = useState(false);
+  const [generatingImageIndex, setGeneratingImageIndex] = useState(null);
 
   useEffect(() => {
     if (data) {
       const copy = JSON.parse(JSON.stringify(data));
       copy.chatbot = copy.chatbot || {
         model: DEFAULT_MODEL
+      };
+      copy.imageGeneration = copy.imageGeneration || {
+        provider: 'openrouter',
+        model: 'openai/gpt-image-1',
+        stylePrompt: 'Create a polished portfolio project cover image with a modern UI/tech aesthetic, subtle gradients, clean composition, and no text or logos.'
       };
       // Ensure all profiles have systemPrompt and resumeText fields
       copy.profiles = copy.profiles.map(p => ({
@@ -38,11 +44,14 @@ const AdminDashboard = () => {
         resumeText: p.resumeText || ""
       }));
       setFormData(copy);
-      if (!editingProfileId && copy.profiles?.length > 0) {
-        setEditingProfileId(copy.profiles[0].id);
-      }
+      setEditingProfileId((currentId) => {
+        if (currentId && copy.profiles.some((profile) => profile.id === currentId)) {
+          return currentId;
+        }
+        return copy.profiles?.[0]?.id || null;
+      });
     }
-  }, [data, editingProfileId]);
+  }, [data]);
 
   const refreshModels = async () => {
     if (modelsLoading) return;
@@ -272,21 +281,71 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleGenerateProjectImage = async (project, projectIndex) => {
+    if (!project?.title || !project?.description) {
+      setMessage({ type: 'danger', text: 'Add a title and description before generating an image.' });
+      return;
+    }
+
+    if (generatingImageIndex !== null) return;
+
+    setGeneratingImageIndex(projectIndex);
+    setMessage(null);
+
+    try {
+      const token = await getAccessTokenSilently();
+      const res = await axios.post(
+        `${API_BASE_URL}/api/generate-project-image`,
+        {
+          title: project.title,
+          description: project.description,
+          profileName: editingProfile?.name,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      const generatedUrl = res.data?.url;
+      if (!generatedUrl) {
+        throw new Error('No image URL was returned.');
+      }
+
+      const newProjects = [...editingProfile.projects];
+      newProjects[projectIndex] = {
+        ...newProjects[projectIndex],
+        imgPath: generatedUrl,
+      };
+      updateEditingProfile('projects', newProjects);
+      setMessage({ type: 'success', text: 'Project image generated successfully.' });
+    } catch (error) {
+      console.error('Project image generation error', error);
+      const errorText = error?.response?.data?.error || error?.message || 'Failed to generate project image.';
+      setMessage({ type: 'danger', text: errorText });
+    } finally {
+      setGeneratingImageIndex(null);
+      setTimeout(() => setMessage(null), 5000);
+    }
+  };
+
   const addProfile = () => {
     const newId = `profile-${Date.now()}`;
-    setFormData({
-      ...formData,
-      profiles: [...formData.profiles, {
-        id: newId,
-        name: "New Profile",
-        roles: [""],
-        avatarUrl: "",
-        resumeUrl: "",
-        experienceBio: "",
-        projects: [],
-        systemPrompt: "You are an AI assistant. When answering, role-play as the profile owner (use 'I', 'my', 'me'). Transform third-person bio into first-person speech. Be concise and default to 80-120 words unless asked for more detail.",
-        resumeText: ""
-      }]
+    setFormData((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        profiles: [...prev.profiles, {
+          id: newId,
+          name: "New Profile",
+          roles: [""],
+          avatarUrl: "",
+          resumeUrl: "",
+          experienceBio: "",
+          projects: [],
+          systemPrompt: "You are an AI assistant. When answering, role-play as the profile owner (use 'I', 'my', 'me'). Transform third-person bio into first-person speech. Be concise and default to 80-120 words unless asked for more detail.",
+          resumeText: ""
+        }]
+      };
     });
     setEditingProfileId(newId);
     setActiveTab("edit-profile");
@@ -297,16 +356,19 @@ const AdminDashboard = () => {
       alert("You must have at least one profile.");
       return;
     }
-    const updated = formData.profiles.filter(p => p.id !== id);
-    let newActiveId = formData.activeProfileId;
-    if (newActiveId === id) newActiveId = updated[0].id;
-    
-    setFormData({
-      ...formData,
-      profiles: updated,
-      activeProfileId: newActiveId
+    setFormData((prev) => {
+      if (!prev) return prev;
+      const updated = prev.profiles.filter((profile) => profile.id !== id);
+      let newActiveId = prev.activeProfileId;
+      if (newActiveId === id) newActiveId = updated[0].id;
+
+      return {
+        ...prev,
+        profiles: updated,
+        activeProfileId: newActiveId
+      };
     });
-    if (editingProfileId === id) setEditingProfileId(updated[0].id);
+    if (editingProfileId === id) setEditingProfileId(formData.profiles.find((profile) => profile.id !== id)?.id || null);
   };
 
   if (!formData) return <Container className="mt-5 text-center"><Spinner animation="border" variant="light"/></Container>;
@@ -315,9 +377,12 @@ const AdminDashboard = () => {
   const editingProfile = formData.profiles[activeProfileIndex];
 
   const updateEditingProfile = (key, value) => {
-    const newProfiles = [...formData.profiles];
-    newProfiles[activeProfileIndex] = { ...newProfiles[activeProfileIndex], [key]: value };
-    setFormData({ ...formData, profiles: newProfiles });
+    setFormData((prev) => {
+      if (!prev) return prev;
+      const newProfiles = [...prev.profiles];
+      newProfiles[activeProfileIndex] = { ...newProfiles[activeProfileIndex], [key]: value };
+      return { ...prev, profiles: newProfiles };
+    });
   };
 
   return (
@@ -479,6 +544,16 @@ const AdminDashboard = () => {
                             <Form.Control className="admin-input" value={proj.imgPath} onChange={(e) => { const newP = [...editingProfile.projects]; newP[idx].imgPath = e.target.value; updateEditingProfile('projects', newP); }}/>
                             <Form.Control type="file" className="admin-input" style={{width: '90px'}} onChange={(e) => handleFileUpload(e, (url) => { const newP = [...editingProfile.projects]; newP[idx].imgPath = url; updateEditingProfile('projects', newP); })} />
                           </div>
+                          <div className="d-flex gap-2 mt-2">
+                            <button
+                              type="button"
+                              className="admin-btn-outline w-100"
+                              onClick={() => handleGenerateProjectImage(proj, idx)}
+                              disabled={generatingImageIndex === idx}
+                            >
+                              {generatingImageIndex === idx ? 'Generating...' : 'Generate AI Image'}
+                            </button>
+                          </div>
                         </Form.Group>
                       </Col>
                       <Col md={6}>
@@ -547,6 +622,65 @@ const AdminDashboard = () => {
                   <Form.Label className="admin-label">System Prompt / Guardrails</Form.Label>
                   <Form.Control as="textarea" rows={6} className="admin-input" value={formData.chatbot.systemPrompt} onChange={(e) => setFormData({...formData, chatbot: {...formData.chatbot, systemPrompt: e.target.value}})} />
                 </Form.Group>
+
+                <hr style={{borderColor: 'rgba(255,255,255,0.1)', margin: '30px 0'}}/>
+
+                <h5 style={{color: '#c770f0'}}>Project Image Generation</h5>
+                <p style={{color: '#8b949e', fontSize: '0.9rem'}}>Uses a separate image model from chat. Leave the default unless you want to switch the generator.</p>
+                <Form.Group className="mb-3">
+                  <Form.Label className="admin-label">Image Provider</Form.Label>
+                  <Form.Select
+                    className="admin-input"
+                    value={formData.imageGeneration?.provider || 'openrouter'}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      imageGeneration: {
+                        ...formData.imageGeneration,
+                        provider: e.target.value,
+                      }
+                    })}
+                  >
+                    <option value="openrouter">OpenRouter</option>
+                    <option value="ollama">Ollama</option>
+                  </Form.Select>
+                </Form.Group>
+                <Form.Group className="mb-3">
+                  <Form.Label className="admin-label">Image Model</Form.Label>
+                  <Form.Control
+                    type="text"
+                    className="admin-input"
+                    value={formData.imageGeneration?.model || ''}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      imageGeneration: {
+                        ...formData.imageGeneration,
+                        model: e.target.value,
+                      }
+                    })}
+                    placeholder={formData.imageGeneration?.provider === 'ollama' ? 'gemma4:31b' : 'openai/gpt-image-1'}
+                  />
+                </Form.Group>
+                <Form.Group className="mb-3">
+                  <Form.Label className="admin-label">Image Prompt Style</Form.Label>
+                  <Form.Control
+                    as="textarea"
+                    rows={4}
+                    className="admin-input"
+                    value={formData.imageGeneration?.stylePrompt || ''}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      imageGeneration: {
+                        ...formData.imageGeneration,
+                        stylePrompt: e.target.value,
+                      }
+                    })}
+                  />
+                </Form.Group>
+                {formData.imageGeneration?.provider === 'ollama' && (
+                  <p style={{ color: '#8b949e', fontSize: '0.85rem', marginTop: '-8px' }}>
+                    Ollama image generation uses the chat model to generate SVG artwork, so any text-capable model can work here.
+                  </p>
+                )}
               </div>
             )}
 

@@ -50,6 +50,23 @@ const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || (() => {
 const PORTFOLIO_COLLECTION = 'portfolio_data';
 const PORTFOLIO_DOCUMENT_ID = 'portfolio_data';
 const RESUME_BUCKET_NAME = process.env.MONGODB_RESUME_BUCKET || 'resumes';
+const PROJECT_IMAGE_BUCKET_NAME = process.env.MONGODB_PROJECT_IMAGE_BUCKET || 'project_images';
+
+// AI Provider Configuration
+const OPENROUTER_API_KEY = process.env.REACT_APP_OPENROUTER_API_KEY || '';
+const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
+
+const OLLAMA_API_KEY = process.env.OLLAMA_API_KEY || '';
+const OLLAMA_API_URL = process.env.OLLAMA_API_URL || 'https://ollama.com/v1/chat/completions';
+// OLLAMA_MODEL is pulled from portfolioData.chatbot.ollama_model (with env fallback)
+const OLLAMA_IMAGE_API_URL = process.env.OLLAMA_IMAGE_API_URL || 'https://ollama.com/api';
+
+const OPENROUTER_IMAGE_API_URL = 'https://openrouter.ai/api/v1/images/generations';
+const DEFAULT_IMAGE_MODEL = process.env.IMAGE_MODEL || 'openai/gpt-image-1';
+const DEFAULT_IMAGE_STYLE_PROMPT = 'Create a polished portfolio project cover image with a modern UI/tech aesthetic, subtle gradients, clean composition, and no text or logos.';
+
+const AVAILABLE_PROVIDERS = ['openrouter', 'ollama'];
+const PRIMARY_PROVIDER = process.env.PRIMARY_AI_PROVIDER || 'openrouter';
 
 // Auth0 Middleware (Validates Opaque Tokens by calling /userinfo)
 const checkJwt = async (req, res, next) => {
@@ -103,11 +120,17 @@ const defaultData = {
   },
   chatbot: {
     model: process.env.OPENROUTER_MODEL || "nvidia/nemotron-3-super-120b-a12b:free",
+    ollama_model: "gpt-oss:120b-cloud",
     backupModels: [
       "meta-llama/llama-2-70b-chat",
       "mistralai/mistral-7b-instruct",
       "gpt-3.5-turbo"
     ]
+  },
+  imageGeneration: {
+    provider: 'openrouter',
+    model: DEFAULT_IMAGE_MODEL,
+    stylePrompt: DEFAULT_IMAGE_STYLE_PROMPT,
   }
 };
 
@@ -145,6 +168,78 @@ const REASONING_MODELS = new Set([
 ]);
 
 const supportsReasoning = (model) => REASONING_MODELS.has(model);
+
+// Helper function to call Ollama Cloud API with automatic fallback to backup models
+const callOllamaWithFallback = async (primaryModel, requestBody, apiKey, backupModels = DEFAULT_BACKUP_MODELS, headers = {}) => {
+  const modelsToTry = [primaryModel, ...backupModels];
+  let lastError = null;
+
+  for (let i = 0; i < modelsToTry.length; i++) {
+    const model = modelsToTry[i];
+    try {
+      console.log(`🤖 Attempting Ollama API call with model: ${model}${i > 0 ? ' (fallback)' : ''}`);
+      
+      const response = await fetch(OLLAMA_API_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+          ...headers,
+        },
+        body: JSON.stringify({
+          ...requestBody,
+          model,
+        }),
+      });
+
+      // Check for rate limiting (429) or other API errors
+      if (!response.ok) {
+        const error = await response.json();
+        const isRateLimit = response.status === 429;
+        const errorMsg = error.message || error.error?.message || `HTTP ${response.status}`;
+        
+        console.warn(`⚠️  Ollama model ${model} failed: ${errorMsg}${isRateLimit ? ' (rate limited)' : ''}`);
+        
+        // If rate limited or server error, try next model
+        if (isRateLimit || response.status >= 500) {
+          lastError = { status: response.status, message: errorMsg, model, provider: 'ollama' };
+          if (i < modelsToTry.length - 1) {
+            console.log(`↪️  Trying backup model...`);
+            continue; // Try next model
+          }
+        }
+        
+        // For client errors (4xx except 429), return immediately
+        return { ok: false, status: response.status, error };
+      }
+
+      // Success - return the response
+      const data = await response.json();
+      if (model !== primaryModel) {
+        console.log(`✅ Ollama fallback model ${model} succeeded`);
+      }
+      return { ok: true, data, usedModel: model, provider: 'ollama' };
+
+    } catch (error) {
+      console.error(`❌ Ollama model ${model} error:`, error.message);
+      lastError = error;
+      
+      if (i < modelsToTry.length - 1) {
+        console.log(`↪️  Trying next fallback model...`);
+        continue; // Try next model
+      }
+    }
+  }
+
+  // All models failed
+  console.error(`❌ All Ollama models failed. Last error:`, lastError);
+  throw {
+    message: 'All Ollama models failed. Please try again later.',
+    lastError,
+    attemptedModels: modelsToTry,
+    provider: 'ollama',
+  };
+};
 
 // Helper function to call OpenRouter API with automatic fallback to backup models
 const callOpenRouterWithFallback = async (primaryModel, requestBody, apiKey, backupModels = DEFAULT_BACKUP_MODELS, headers = {}) => {
@@ -196,7 +291,7 @@ const callOpenRouterWithFallback = async (primaryModel, requestBody, apiKey, bac
       if (model !== primaryModel) {
         console.log(`✅ Fallback model ${model} succeeded`);
       }
-      return { ok: true, data, usedModel: model };
+      return { ok: true, data, usedModel: model, provider: 'openrouter' };
 
     } catch (error) {
       console.error(`❌ Model ${model} error:`, error.message);
@@ -215,7 +310,148 @@ const callOpenRouterWithFallback = async (primaryModel, requestBody, apiKey, bac
     message: 'All AI models failed. Please try again later.',
     lastError,
     attemptedModels: modelsToTry,
+    provider: 'openrouter',
   };
+};
+
+const uploadGeneratedImageToBlob = async (imageBuffer, filename, contentType = 'image/png') => {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    return null;
+  }
+
+  const blob = await put(filename, imageBuffer, {
+    access: 'public',
+    addRandomSuffix: true,
+    contentType,
+  });
+
+  return blob.url;
+};
+
+const normalizeImageGenerationProvider = (value) => {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'ollama') return 'ollama';
+  return 'openrouter';
+};
+
+const extractGeneratedImageResult = async (response) => {
+  const payload = await response.json().catch(() => ({}));
+
+  const candidate = payload?.data?.[0] || payload?.images?.[0] || payload?.output?.[0] || payload?.result?.[0] || payload;
+  const imageUrl = candidate?.url || candidate?.image_url || candidate?.imageUrl;
+  const base64Image = candidate?.b64_json || candidate?.base64 || candidate?.image_base64 || candidate?.image;
+  const mimeType = candidate?.mime_type || candidate?.content_type || 'image/png';
+
+  return {
+    payload,
+    imageUrl,
+    base64Image,
+    mimeType,
+  };
+};
+
+const callOpenRouterImageGeneration = async ({ model, prompt, apiKey, headers = {} }) => {
+  const response = await fetch(OPENROUTER_IMAGE_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+      ...headers,
+    },
+    body: JSON.stringify({
+      model,
+      prompt,
+      size: '1024x1024',
+    }),
+  });
+
+  const { payload, imageUrl, base64Image, mimeType } = await extractGeneratedImageResult(response);
+  if (!response.ok) {
+    const errorMsg = payload?.error?.message || payload?.message || `HTTP ${response.status}`;
+    throw new Error(errorMsg);
+  }
+
+  if (base64Image) {
+    const imageBuffer = Buffer.from(base64Image, 'base64');
+    const uploadResult = await uploadGeneratedImageToMongo(imageBuffer, `project-image-${Date.now()}.png`, mimeType);
+    if (uploadResult) {
+      return { url: uploadResult.url, provider: 'openrouter', model };
+    }
+  }
+
+  if (imageUrl) {
+    const imageBuffer = await fetch(imageUrl).then(r => r.buffer());
+    const uploadResult = await uploadGeneratedImageToMongo(imageBuffer, `project-image-${Date.now()}.png`, mimeType);
+    if (uploadResult) {
+      return { url: uploadResult.url, provider: 'openrouter', model };
+    }
+  }
+
+  throw new Error('Image generation succeeded but no usable image URL was returned.');
+};
+
+const stripCodeFences = (content) => {
+  if (!content) return '';
+  return String(content)
+    .replace(/^```(?:svg|xml|html)?\s*/i, '')
+    .replace(/```\s*$/i, '')
+    .trim();
+};
+
+const sanitizeSvgContent = (svgContent) => {
+  const cleaned = stripCodeFences(svgContent);
+  if (!/<svg[\s>]/i.test(cleaned)) {
+    throw new Error('Ollama did not return valid SVG markup.');
+  }
+  return cleaned;
+};
+
+const callOllamaImageGeneration = async ({ model, prompt, apiKey, headers = {} }) => {
+  const response = await fetch(OLLAMA_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+      ...headers,
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        {
+          role: 'system',
+          content: 'You generate only valid, standalone SVG markup for a portfolio project image. Return raw SVG only, no markdown, no explanation, no backticks.',
+        },
+        {
+          role: 'user',
+          content: [
+            'Create a square SVG illustration for a portfolio project card.',
+            'The image should be modern, polished, and abstract, with subtle gradients and tech-inspired shapes.',
+            'Do not include any text, logos, watermarks, or brand names.',
+            `Project prompt: ${prompt}`,
+          ].join('\n\n'),
+        },
+      ],
+      stream: false,
+      options: {
+        temperature: 0.8,
+      },
+    }),
+  });
+
+  const { payload } = await extractGeneratedImageResult(response);
+  if (!response.ok) {
+    const errorMsg = payload?.error || payload?.message || `HTTP ${response.status}`;
+    throw new Error(errorMsg);
+  }
+
+  const svgMarkup = sanitizeSvgContent(payload?.response || payload?.message?.content || payload?.choices?.[0]?.message?.content || '');
+  const svgBuffer = Buffer.from(svgMarkup, 'utf8');
+  const uploadResult = await uploadGeneratedImageToMongo(svgBuffer, `project-image-${Date.now()}.svg`, 'image/svg+xml');
+  if (!uploadResult) {
+    throw new Error('SVG generation succeeded but could not upload the image.');
+  }
+
+  return { url: uploadResult.url, provider: 'ollama', model };
 };
 
 let mongoClient = null;
@@ -387,6 +623,12 @@ const getResumeBucket = async () => {
   return new GridFSBucket(db, { bucketName: RESUME_BUCKET_NAME });
 };
 
+const getProjectImageBucket = async () => {
+  const db = await getMongoDb();
+  if (!db) return null;
+  return new GridFSBucket(db, { bucketName: PROJECT_IMAGE_BUCKET_NAME });
+};
+
 const uploadResumePdfToMongo = async (file) => {
   const bucket = await getResumeBucket();
   if (!bucket) return null;
@@ -412,9 +654,35 @@ const uploadResumePdfToMongo = async (file) => {
   };
 };
 
-const streamGridFsFile = async (fileId, req, res) => {
-  const bucket = await getResumeBucket();
-  if (!bucket) return false;
+const uploadGeneratedImageToMongo = async (imageBuffer, filename, contentType = 'image/png') => {
+  const bucket = await getProjectImageBucket();
+  if (!bucket) return null;
+
+  const uploadStream = bucket.openUploadStream(filename || `project-image-${Date.now()}.png`, {
+    contentType,
+    metadata: {
+      uploadedAt: new Date(),
+      type: 'project-image',
+    },
+  });
+
+  await new Promise((resolve, reject) => {
+    uploadStream.on('error', reject);
+    uploadStream.on('finish', resolve);
+    uploadStream.end(imageBuffer);
+  });
+
+  const fileId = uploadStream.id.toString();
+  return {
+    fileId,
+    url: `/api/project-image/${fileId}`,
+  };
+};
+
+const streamGridFsFile = async (fileId, req, res, bucketName = RESUME_BUCKET_NAME) => {
+  const db = await getMongoDb();
+  if (!db) return false;
+  const bucket = new GridFSBucket(db, { bucketName });
 
   let objectId;
   try {
@@ -428,11 +696,12 @@ const streamGridFsFile = async (fileId, req, res) => {
 
   const file = files[0];
   const uploadTime = new Date(file.uploadDate || Date.now());
-  const etag = `"resume-${file._id.toString()}-${file.length || 0}-${uploadTime.getTime()}"`;
+  const fileTypePrefix = bucketName === PROJECT_IMAGE_BUCKET_NAME ? 'image' : 'resume';
+  const etag = `"${fileTypePrefix}-${file._id.toString()}-${file.length || 0}-${uploadTime.getTime()}"`;
 
   res.set({
     'Content-Type': file.contentType || 'application/pdf',
-    'Content-Disposition': `inline; filename="${file.filename || 'resume.pdf'}"`,
+    'Content-Disposition': `inline; filename="${file.filename || bucketName === PROJECT_IMAGE_BUCKET_NAME ? 'image' : 'resume.pdf'}"`,
     ETag: etag,
     'Last-Modified': uploadTime.toUTCString(),
     'Cache-Control': 'public, max-age=31536000, immutable',
@@ -627,6 +896,20 @@ app.get('/api/resume/:fileId', async (req, res) => {
   }
 });
 
+app.get('/api/project-image/:fileId', async (req, res) => {
+  try {
+    const served = await streamGridFsFile(req.params.fileId, req, res, PROJECT_IMAGE_BUCKET_NAME);
+    if (!served) {
+      return res.status(404).json({ error: 'Project image not found' });
+    }
+  } catch (error) {
+    console.error('Project image download error:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Failed to load project image' });
+    }
+  }
+});
+
 // Dev-only helper: allow saving portfolio without Auth0 when running locally.
 app.post("/api/portfolio/debug-save", async (req, res) => {
   try {
@@ -793,12 +1076,15 @@ app.post("/api/parse-resume", checkJwt, requireAdmin, async (req, res) => {
 
     // 3. AI Parsing
     const portfolioData = await getPortfolioData();
-    const apiKey = process.env.REACT_APP_OPENROUTER_API_KEY;
+    const primaryProvider = PRIMARY_PROVIDER;
+    const openrouterKey = OPENROUTER_API_KEY;
+    const ollamaKey = OLLAMA_API_KEY;
     const model = portfolioData.chatbot?.model || "nvidia/nemotron-3-super-120b-a12b:free";
+    const ollamaModel = portfolioData.chatbot?.ollama_model || process.env.OLLAMA_MODEL || "gpt-oss:120b-cloud";
     const backupModels = portfolioData.chatbot?.backupModels || DEFAULT_BACKUP_MODELS;
 
-    if (!apiKey) {
-      return res.json({ url, error: "API key not configured." });
+    if (!openrouterKey && !ollamaKey) {
+      return res.json({ url, error: "No AI provider configured (OpenRouter or Ollama)." });
     }
 
     const systemPrompt = `You are a professional resume parser. I will provide you with the raw text extracted from a resume. 
@@ -839,15 +1125,59 @@ You must analyze the text and return a JSON object with exactly this schema:
     const timeout = setTimeout(() => abortController.abort(), 35000);
     
     try {
-      const result = await callOpenRouterWithFallback(model, requestBody, apiKey, backupModels, {
-        "HTTP-Referer": "http://localhost:3000",
-        "X-Title": "Goutham's AI Parser",
-      });
+      let result = null;
+      let lastError = null;
+
+      // Try primary provider first
+      if (primaryProvider === 'ollama' && ollamaKey) {
+        try {
+          result = await callOllamaWithFallback(ollamaModel, requestBody, ollamaKey, backupModels, {
+            "HTTP-Referer": "http://localhost:3000",
+            "X-Title": "Goutham's AI Parser",
+          });
+        } catch (error) {
+          lastError = error;
+          console.log('⚠️  Ollama parsing failed, falling back to OpenRouter...');
+        }
+      } else if (openrouterKey) {
+        try {
+          result = await callOpenRouterWithFallback(model, requestBody, openrouterKey, backupModels, {
+            "HTTP-Referer": "http://localhost:3000",
+            "X-Title": "Goutham's AI Parser",
+          });
+        } catch (error) {
+          lastError = error;
+          if (ollamaKey) {
+            console.log('⚠️  OpenRouter parsing failed, falling back to Ollama...');
+          }
+        }
+      }
+
+      // Try secondary provider if primary failed
+      if (!result && primaryProvider === 'openrouter' && ollamaKey) {
+        try {
+          result = await callOllamaWithFallback(ollamaModel, requestBody, ollamaKey, backupModels, {
+            "HTTP-Referer": "http://localhost:3000",
+            "X-Title": "Goutham's AI Parser",
+          });
+        } catch (error) {
+          lastError = error;
+        }
+      } else if (!result && primaryProvider === 'ollama' && openrouterKey) {
+        try {
+          result = await callOpenRouterWithFallback(model, requestBody, openrouterKey, backupModels, {
+            "HTTP-Referer": "http://localhost:3000",
+            "X-Title": "Goutham's AI Parser",
+          });
+        } catch (error) {
+          lastError = error;
+        }
+      }
       
       clearTimeout(timeout);
 
-      if (!result.ok) {
-        return res.json({ url, error: "AI API error during parsing." });
+      if (!result || !result.ok) {
+        return res.json({ url, error: "AI API error during parsing. All providers failed." });
       }
 
       const aiData = result.data;
@@ -879,46 +1209,150 @@ You must analyze the text and return a JSON object with exactly this schema:
   }
 });
 
+app.post("/api/generate-project-image", checkJwt, requireAdmin, async (req, res) => {
+  try {
+    const portfolioData = await getPortfolioData();
+    const imageGeneration = portfolioData.imageGeneration || {};
+    const provider = normalizeImageGenerationProvider(imageGeneration.provider);
+    const model = imageGeneration.model || DEFAULT_IMAGE_MODEL;
+    const stylePrompt = imageGeneration.stylePrompt || DEFAULT_IMAGE_STYLE_PROMPT;
+    const openrouterKey = OPENROUTER_API_KEY;
+    const ollamaKey = OLLAMA_API_KEY;
+
+    if (provider === 'openrouter' && !openrouterKey) {
+      return res.status(500).json({ error: 'OpenRouter image API key not configured' });
+    }
+
+    if (provider === 'ollama' && !ollamaKey) {
+      return res.status(500).json({ error: 'Ollama image API key not configured' });
+    }
+
+    const { title, description, profileName } = req.body || {};
+    if (!title || !String(title).trim()) {
+      return res.status(400).json({ error: 'Project title is required' });
+    }
+
+    const prompt = [
+      stylePrompt,
+      `Project title: ${String(title).trim()}`,
+      description ? `Project description: ${String(description).trim()}` : '',
+      profileName ? `Profile context: ${String(profileName).trim()}` : '',
+      'Output a single high-quality square or portrait-friendly hero image for a portfolio card.',
+    ].filter(Boolean).join('\n\n');
+
+    const result = provider === 'ollama'
+      ? await callOllamaImageGeneration({
+          model,
+          prompt,
+          apiKey: ollamaKey,
+          headers: {
+            'HTTP-Referer': 'http://localhost:3000',
+            'X-Title': "Goutham's Portfolio Image Generator",
+          },
+        })
+      : await callOpenRouterImageGeneration({
+          model,
+          prompt,
+          apiKey: openrouterKey,
+          headers: {
+            'HTTP-Referer': 'http://localhost:3000',
+            'X-Title': "Goutham's Portfolio Image Generator",
+          },
+        });
+
+    return res.json({
+      success: true,
+      url: result.url,
+      provider: result.provider,
+      model: result.model,
+    });
+  } catch (error) {
+    console.error('Project image generation error:', error);
+    return res.status(500).json({ error: error?.message || 'Failed to generate project image' });
+  }
+});
+
 app.post("/api/models", async (req, res) => {
   try {
-    const apiKey = process.env.REACT_APP_OPENROUTER_API_KEY;
+    const { provider } = req.body;
+    const targetProvider = provider || PRIMARY_PROVIDER;
 
-    const isFreeModel = (model) => {
-      const promptPrice = Number(model?.pricing?.prompt);
-      const completionPrice = Number(model?.pricing?.completion);
-      return Number.isFinite(promptPrice) && Number.isFinite(completionPrice) && promptPrice === 0 && completionPrice === 0;
-    };
+    // Fetch from OpenRouter
+    if (targetProvider === 'openrouter') {
+      const apiKey = OPENROUTER_API_KEY;
 
-    const fetchModels = async (key) => {
-      const headers = {};
-      if (key) headers.Authorization = `Bearer ${key}`;
-      return fetch("https://openrouter.ai/api/v1/models", { headers });
-    };
+      const isFreeModel = (model) => {
+        const promptPrice = Number(model?.pricing?.prompt);
+        const completionPrice = Number(model?.pricing?.completion);
+        return Number.isFinite(promptPrice) && Number.isFinite(completionPrice) && promptPrice === 0 && completionPrice === 0;
+      };
 
-    // OpenRouter model listing is public. Try with key first (if provided), then fallback without key.
-    let response = await fetchModels(apiKey);
-    if (!response.ok && apiKey) {
-      response = await fetchModels("");
+      const fetchModels = async (key) => {
+        const headers = {};
+        if (key) headers.Authorization = `Bearer ${key}`;
+        return fetch("https://openrouter.ai/api/v1/models", { headers });
+      };
+
+      // OpenRouter model listing is public. Try with key first (if provided), then fallback without key.
+      let response = await fetchModels(apiKey);
+      if (!response.ok && apiKey) {
+        response = await fetchModels("");
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        return res.status(response.status).json({ error: `Failed to fetch OpenRouter models: ${errorText}` });
+      }
+
+      const payload = await response.json();
+      const models = Array.isArray(payload?.data)
+        ? payload.data
+            .map((model) => ({
+              id: model.id,
+              name: model.name || model.id,
+              pricing: model.pricing,
+              provider: 'openrouter',
+            }))
+            .filter((model) => model.id && isFreeModel(model))
+            .sort((a, b) => a.id.localeCompare(b.id))
+        : [];
+
+      return res.json({ models, provider: 'openrouter' });
     }
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      return res.status(response.status).json({ error: `Failed to fetch models: ${errorText}` });
+    // Fetch from Ollama Cloud
+    if (targetProvider === 'ollama') {
+      if (!OLLAMA_API_KEY) {
+        return res.status(400).json({ error: "Ollama API key not configured" });
+      }
+
+      const response = await fetch("https://ollama.com/v1/models", {
+        headers: {
+          Authorization: `Bearer ${OLLAMA_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        return res.status(response.status).json({ error: `Failed to fetch Ollama models: ${errorText}` });
+      }
+
+      const payload = await response.json();
+      const models = Array.isArray(payload?.data)
+        ? payload.data
+            .map((model) => ({
+              id: model.id,
+              name: model.name || model.id,
+              provider: 'ollama',
+            }))
+            .sort((a, b) => a.id.localeCompare(b.id))
+        : [];
+
+      return res.json({ models, provider: 'ollama' });
     }
 
-    const payload = await response.json();
-    const models = Array.isArray(payload?.data)
-      ? payload.data
-          .map((model) => ({
-            id: model.id,
-            name: model.name || model.id,
-            pricing: model.pricing,
-          }))
-          .filter((model) => model.id && isFreeModel(model))
-          .sort((a, b) => a.id.localeCompare(b.id))
-      : [];
-
-    res.json({ models });
+    res.status(400).json({ error: "Invalid or unknown provider" });
   } catch (error) {
     console.error("Models API error:", error.message);
     res.status(500).json({ error: "Failed to fetch models" });
@@ -935,8 +1369,11 @@ app.post("/api/chat", async (req, res) => {
   pruneExpiredChatSessions();
 
   const portfolioData = await getPortfolioData();
-  const apiKey = process.env.REACT_APP_OPENROUTER_API_KEY;
+  const primaryProvider = PRIMARY_PROVIDER;
+  const openrouterKey = OPENROUTER_API_KEY;
+  const ollamaKey = OLLAMA_API_KEY;
   const model = portfolioData.chatbot?.model || "nvidia/nemotron-3-super-120b-a12b:free";
+  const ollamaModel = portfolioData.chatbot?.ollama_model || process.env.OLLAMA_MODEL || "gpt-oss:120b-cloud";
   const backupModels = portfolioData.chatbot?.backupModels || DEFAULT_BACKUP_MODELS;
 
   const { activeProfile, systemPrompt } = buildProfileSystemPrompt(portfolioData, activeProfileId);
@@ -968,9 +1405,9 @@ app.post("/api/chat", async (req, res) => {
     chatSessions.set(sessionId, session);
   }
 
-  if (!apiKey) {
-    console.error("❌ API key not configured.");
-    return res.status(500).json({ error: "API key not configured" });
+  if (!openrouterKey && !ollamaKey) {
+    console.error("❌ No AI provider configured (OpenRouter or Ollama).");
+    return res.status(500).json({ error: "No AI provider configured" });
   }
 
   console.log("📨 Chat request:", String(message).substring(0, 50) + "...", "| session:", sessionId, "| profile:", profileId);
@@ -996,18 +1433,61 @@ app.post("/api/chat", async (req, res) => {
     const timeout = setTimeout(() => abortController.abort(), 25000);
 
     try {
-      const result = await callOpenRouterWithFallback(model, requestBody, apiKey, backupModels, {
-        "HTTP-Referer": "http://localhost:3000",
-        "X-Title": "Goutham's AI Assistant",
-      });
+      let result = null;
+      let lastError = null;
+
+      // Try primary provider first
+      if (primaryProvider === 'ollama' && ollamaKey) {
+        try {
+          result = await callOllamaWithFallback(ollamaModel, requestBody, ollamaKey, backupModels, {
+            "HTTP-Referer": "http://localhost:3000",
+            "X-Title": "Goutham's AI Assistant",
+          });
+        } catch (error) {
+          lastError = error;
+          console.log('⚠️  Ollama chat failed, falling back to OpenRouter...');
+        }
+      } else if (openrouterKey) {
+        try {
+          result = await callOpenRouterWithFallback(model, requestBody, openrouterKey, backupModels, {
+            "HTTP-Referer": "http://localhost:3000",
+            "X-Title": "Goutham's AI Assistant",
+          });
+        } catch (error) {
+          lastError = error;
+          if (ollamaKey) {
+            console.log('⚠️  OpenRouter chat failed, falling back to Ollama...');
+          }
+        }
+      }
+
+      // Try secondary provider if primary failed
+      if (!result && primaryProvider === 'openrouter' && ollamaKey) {
+        try {
+          result = await callOllamaWithFallback(ollamaModel, requestBody, ollamaKey, backupModels, {
+            "HTTP-Referer": "http://localhost:3000",
+            "X-Title": "Goutham's AI Assistant",
+          });
+        } catch (error) {
+          lastError = error;
+        }
+      } else if (!result && primaryProvider === 'ollama' && openrouterKey) {
+        try {
+          result = await callOpenRouterWithFallback(model, requestBody, openrouterKey, backupModels, {
+            "HTTP-Referer": "http://localhost:3000",
+            "X-Title": "Goutham's AI Assistant",
+          });
+        } catch (error) {
+          lastError = error;
+        }
+      }
 
       clearTimeout(timeout);
 
-      if (!result.ok) {
-        return res.status(result.status).json({ 
-          error: result.error.message || result.error.error?.message || "API error",
-          details: result.error,
-          model: result.usedModel,
+      if (!result || !result.ok) {
+        return res.status(500).json({ 
+          error: "All AI providers failed. Please try again.",
+          lastError: lastError?.message || 'Unknown error',
         });
       }
 
@@ -1025,7 +1505,7 @@ app.post("/api/chat", async (req, res) => {
       session.updatedAt = Date.now();
       chatSessions.set(sessionId, session);
 
-      res.status(200).json({ reply, sessionId, profileId, profileName, model: result.usedModel, reasoning_details: reasoningDetails });
+      res.status(200).json({ reply, sessionId, profileId, profileName, model: result.usedModel, provider: result.provider, reasoning_details: reasoningDetails });
     } catch (fallbackError) {
       clearTimeout(timeout);
       if (fallbackError?.message?.includes('aborted')) {

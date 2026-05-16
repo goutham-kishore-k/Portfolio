@@ -39,6 +39,11 @@ export const PortfolioProvider = ({ children }) => {
       model: "nvidia/nemotron-3-super-120b-a12b:free",
       systemPrompt: "You are Goutham's AI assistant. Answer questions about his 4+ years of data engineering experience, projects, skills in Apache NiFi, Kafka, Python, SQL, Power BI, and Tableau. Be professional, concise, and default to 80-120 words unless the user asks for more detail."
     },
+    imageGeneration: {
+      provider: "openrouter",
+      model: "openai/gpt-image-1",
+      stylePrompt: "Create a polished portfolio project cover image with a modern UI/tech aesthetic, subtle gradients, clean composition, and no text or logos."
+    },
   };
 
   const isValidPortfolioData = (value) => Boolean(
